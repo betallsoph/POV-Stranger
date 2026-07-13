@@ -16,4 +16,9 @@ enum AtlasConfig {
     static var isConfigured: Bool {
         endpointBase != nil
     }
+
+    /// Full cloud mode needs App ID (auth) + endpoint base (functions).
+    static var requiresAuth: Bool {
+        isConfigured && appId != nil
+    }
 }
