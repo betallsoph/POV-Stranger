@@ -33,6 +33,8 @@ Copy each file from `backend/atlas/functions/` into Atlas App Services → Funct
 | `matchEnqueue` | `matchEnqueue.js` | Join queue + pair strangers |
 | `registerDeviceToken` | `registerDeviceToken.js` | Save APNs token |
 | `getActiveSession` | `getActiveSession.js` | Fetch current session for user |
+| `uploadPhoto` | `uploadPhoto.js` | Upload JPEG to GridFS + `hour_uploads` |
+| `getPartnerPhoto` | `getPartnerPhoto.js` | Download partner photo for hour |
 
 **Dependencies:** Add the `_lib/` helpers inline or as shared modules per Atlas UI.
 
@@ -47,6 +49,8 @@ For each function, create an HTTPS Endpoint (authenticated) in App Services:
 | `matchEnqueue` | `matchEnqueue` | POST |
 | `registerDeviceToken` | `registerDeviceToken` | POST |
 | `getActiveSession` | `getActiveSession` | POST |
+| `uploadPhoto` | `uploadPhoto` | POST |
+| `getPartnerPhoto` | `getPartnerPhoto` | POST |
 
 Copy the **App Services HTTP base URL** — iOS needs it in `Secrets.xcconfig`.
 

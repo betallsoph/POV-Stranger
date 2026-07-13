@@ -263,9 +263,11 @@ enum SessionStatus: String, Codable {
 - [ ] Deploy function + HTTPS endpoint (manual)
 
 ### 4.4 Photo relay
-- [ ] GridFS upload via Function
-- [ ] `upload/confirm` → APNs silent push
-- [ ] SwiftData cache + widget update
+- [x] GridFS upload via `uploadPhoto` Function
+- [x] `getPartnerPhoto` — fetch partner blob from GridFS
+- [x] `AtlasSessionService.submitPhoto` + SwiftData cache
+- [ ] APNs silent push on upload (Phase 4d)
+- [ ] Widget update via push handler (Phase 4d)
 
 ### 4.5 iOS integration
 - [x] `SessionServiceProtocol` + `SessionServiceFactory`
