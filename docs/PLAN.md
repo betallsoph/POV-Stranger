@@ -222,45 +222,53 @@ enum SessionStatus: String, Codable {
 > Goal: Two real devices can match and exchange photos.  
 > **Read [`docs/BACKEND.md`](BACKEND.md) first** — full architecture, schema, storage TTL, and stack decision.
 
-### Stack decision (2026-07-13)
+### Stack decision (2026-07-13, updated)
 
 | Layer | Choice |
 |-------|--------|
-| BaaS | **Supabase** (Postgres + Storage + Edge Functions) |
-| Auth | Sign in with Apple → Supabase Auth JWT |
-| Photo storage | Supabase Storage, private bucket, signed URLs, 25h TTL |
-| Push | APNs HTTP/2 direct from Edge Functions |
-| Weather | WeatherKit on iOS client (not server) |
+| Local DB (iOS) | **Realm Swift SDK** (Atlas Device SDK — local only) |
+| Cloud DB | **MongoDB Atlas** |
+| Photo blobs | **GridFS** (25h TTL) |
+| API / logic | **Atlas Functions** + Triggers |
+| Auth | Sign in with Apple → Atlas Auth or custom JWT |
+| Push | APNs from Atlas Functions |
+| Weather | WeatherKit on iOS client |
+| Rematch | **Same pair OK after new ISO week** — not within same week |
+
+> ⚠️ Atlas **Device Sync** is EOL (Sept 2025). See [`BACKEND.md` §EOL](BACKEND.md#️-critical-atlas-device-sync-eol).
 
 ### 4.1 Setup
-- [ ] Decision recorded in BACKEND.md ✅
-- [ ] Create Supabase dev project
-- [ ] SQL migrations (see BACKEND.md §6)
-- [ ] iOS `xcconfig` for secrets (gitignored)
+- [ ] MongoDB Atlas M0 cluster
+- [ ] Collections + TTL indexes (see BACKEND.md §5)
+- [ ] GridFS for photos
+- [ ] Realm Swift SDK in Xcode
+- [ ] `Secrets.xcconfig` (gitignored)
 
 ### 4.2 Auth
-- [ ] Sign in with Apple on iOS
-- [ ] Supabase `signInWithIdToken`
-- [ ] `device_tokens` upsert on launch
+- [ ] Sign in with Apple
+- [ ] Atlas user + `users` collection upsert
+- [ ] `device_tokens` on launch
 
 ### 4.3 Matching
-- [ ] `match-queue/enqueue` Edge Function
-- [ ] Timezone-distance scoring + `pair_history`
-- [ ] Block / cooldown checks
+- [ ] `matchEnqueue` Atlas Function
+- [ ] **Weekly rematch:** block same pair in same ISO week; allow next week
+- [ ] `pair_history` with `isoWeek` + `isoWeekYear`
+- [ ] Block list overrides rematch
 
 ### 4.4 Photo relay
-- [ ] Signed upload URL flow
+- [ ] GridFS upload via Function
 - [ ] `upload/confirm` → APNs silent push
-- [ ] Partner download → widget refresh
+- [ ] Realm local cache → widget
 
 ### 4.5 iOS integration
-- [ ] `SessionServiceProtocol` + `SupabaseSessionService`
+- [ ] `SessionServiceProtocol` + `AtlasSessionService`
+- [ ] Migrate active session from SwiftData → Realm (or bridge)
 - [ ] Keep `MockSessionService` for previews
-- [ ] Background `remote-notification` handler
 
 ### 4.6 Purge
-- [ ] `pg_cron` purge job (25h)
-- [ ] Storage prefix delete on session end
+- [ ] TTL indexes on `hour_uploads`, `farewells`
+- [ ] Scheduled Trigger: GridFS + session purge
+- [ ] **Keep** `pair_history` (metadata only)
 
 **Phase 4 done when:** Two TestFlight devices match, exchange photos for 1+ hours, receive push updates.
 
@@ -438,10 +446,12 @@ POV-Stranger/
 | 2026-07-13 | Farewell window = last 2 hours | Enough time without rushing |
 | 2026-07-13 | Mock partner first, backend later | Unblock UI development |
 | 2026-07-13 | SwiftData for local session | Native, fits ephemeral on-device cache |
-| TBD | Supabase vs Firebase | **Decided: Supabase** — see `docs/BACKEND.md` |
-| TBD | Exact photo compression target | Start 800px / 80KB JPEG, tune with real uploads |
-| 2026-07-13 | Backend stack | Supabase + APNs direct + WeatherKit client-side |
-| 2026-07-13 | Storage TTL | 25h; `pair_history` kept permanently (uuid only) |
+| TBD | Supabase vs Firebase | **Superseded:** MongoDB Atlas — see `docs/BACKEND.md` |
+| TBD | Exact photo compression target | 800px / 80KB JPEG |
+| 2026-07-13 | Backend stack | MongoDB Atlas + Realm local + Atlas Functions |
+| 2026-07-13 | Storage | GridFS, TTL 25h |
+| 2026-07-13 | Rematch rule | **Same week blocked; new ISO week allowed** ("có duyên thì gặp lại") |
+| 2026-07-13 | Device Sync | **Not used** — EOL Sept 2025; HTTPS Functions instead |
 
 ---
 

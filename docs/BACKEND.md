@@ -2,9 +2,27 @@
 
 > **Status:** Planning (pre-Phase 4)  
 > **Last updated:** 2026-07-13  
-> **Audience:** Anyone implementing backend relay, iOS sync, or infra for this app.
+> **Stack:** MongoDB Atlas + Realm (local) + Atlas Functions  
+> **Audience:** Anyone implementing backend relay, iOS sync, or infra.
 
-Read this before touching Phase 4 in [`PLAN.md`](PLAN.md).
+Read this before Phase 4 in [`PLAN.md`](PLAN.md).
+
+---
+
+## ⚠️ Critical: Atlas Device Sync EOL
+
+**MongoDB Atlas Device Sync (formerly Realm Sync) reached end-of-life on September 30, 2025.**
+
+| Product | Status (2026) |
+|---------|----------------|
+| Atlas Device Sync | ❌ Shutdown |
+| Atlas App Services (full) | ❌ EOL — Triggers partially remain in Atlas UI |
+| Realm Swift SDK (local) | ✅ Open source, local-only DB still works |
+| MongoDB Atlas (cloud) | ✅ Fully supported |
+
+**What this means for POV-Stranger:** We use the **MongoDB Atlas Device SDK (Realm Swift SDK) as a local database** on iOS, and talk to **MongoDB Atlas** via **HTTPS Atlas Functions** (or MongoDB Data API). We do **not** rely on automatic Device Sync.
+
+This is still a valid "MongoDB mobile" architecture — local Realm + Atlas backend — just without the deprecated sync pipe.
 
 ---
 
@@ -12,21 +30,21 @@ Read this before touching Phase 4 in [`PLAN.md`](PLAN.md).
 
 1. [What the backend must do](#1-what-the-backend-must-do)
 2. [What the backend must NOT do](#2-what-the-backend-must-not-do)
-3. [Recommended stack (decision)](#3-recommended-stack-decision)
-4. [Alternatives considered](#4-alternatives-considered)
-5. [System architecture](#5-system-architecture)
-6. [Data model](#6-data-model)
+3. [Recommended stack](#3-recommended-stack)
+4. [System architecture](#4-system-architecture)
+5. [Data model (MongoDB)](#5-data-model-mongodb)
+6. [Local model (Realm on iOS)](#6-local-model-realm-on-ios)
 7. [Storage design & TTL](#7-storage-design--ttl)
-8. [Matching service](#8-matching-service)
+8. [Matching & weekly rematch rule](#8-matching--weekly-rematch-rule)
 9. [Photo relay flow](#9-photo-relay-flow)
 10. [Push notifications (APNs)](#10-push-notifications-apns)
 11. [Auth & identity](#11-auth--identity)
-12. [Security, moderation & abuse](#12-security-moderation--abuse)
+12. [Security & moderation](#12-security--moderation)
 13. [iOS client integration](#13-ios-client-integration)
 14. [Environments & secrets](#14-environments--secrets)
 15. [Cost model](#15-cost-model)
 16. [Implementation phases](#16-implementation-phases)
-17. [Open product decisions](#17-open-product-decisions)
+17. [Decision log](#17-decision-log)
 
 ---
 
@@ -34,501 +52,410 @@ Read this before touching Phase 4 in [`PLAN.md`](PLAN.md).
 
 | Capability | Detail |
 |------------|--------|
-| **Match strangers** | Pair two users for exactly one 24h session |
-| **Relay photos** | 1-1 upload/download per hour slot, no feed |
-| **Deliver metadata** | Partner country, timezone, approximate distance, weather summary (client or server computed) |
-| **Notify partner** | Silent push → partner app downloads photo → widget refresh |
-| **Farewell message** | One text per user, deliver once at session end |
-| **Expire & purge** | Auto-delete all session data ≤ 25h after match |
-| **Block rematch** | Same two users never paired again |
-| **Report / block** | Instant unmatch + prevent future pairing |
+| **Match strangers** | Pair two users for one 24h session |
+| **Relay photos** | 1-1 per hour slot, no feed |
+| **Deliver metadata** | Country, timezone, distance, weather summary |
+| **Notify partner** | Silent APNs → download → widget refresh |
+| **Farewell message** | One text per user, deliver once at end |
+| **Expire & purge** | Delete session data ≤ 25h after match |
+| **Weekly rematch rule** | Same pair **can** meet again — but **not in the same ISO calendar week** |
+| **Report / block** | Instant unmatch; block overrides rematch |
 
 ### Non-functional requirements
 
 | Requirement | Target |
 |-------------|--------|
-| Photo size | ≤ 80 KB JPEG, max 800px (already enforced client-side) |
-| Uploads per active pair per day | ≤ 48 (24 × 2 users) |
-| Storage retention | **25 hours max** (buffer after 24h session) |
-| Latency (photo to partner) | < 5s P95 (excluding user opening app) |
-| Uptime | 99.5% (MVP) — app degrades gracefully offline |
-| Cost at 1k DAU | **< $30/month** infra |
+| Photo size | ≤ 80 KB JPEG, 800px max (client) |
+| Storage retention | **25 hours max** |
+| Cost at 1k DAU | < $30/month |
+| Offline | Local Realm holds active session; sync when online |
 
 ---
 
 ## 2. What the backend must NOT do
 
-- **No social graph** — no friends, followers, profiles
-- **No chat** — except one farewell message at end
-- **No photo history** — no gallery, no replay, no backups
-- **No precise GPS storage** — country + coarse region only
-- **No public URLs** — photos are private to the paired session
-- **No ML on server for MVP** — optional later; start with client-side + hash blocklist
+- No social graph, no profiles, no chat (except farewell)
+- No photo history or gallery
+- No precise GPS on server
+- No public photo URLs
+- **No permanent "never pair again"** — rematch allowed after a new week
 
 ---
 
-## 3. Recommended stack (decision)
+## 3. Recommended stack
 
-### ✅ Primary recommendation: **Supabase + APNs direct**
+### ✅ Decision: **MongoDB Atlas + Realm (local) + Atlas Functions**
 
-| Layer | Technology | Why |
-|-------|------------|-----|
-| **Auth** | Supabase Auth + Sign in with Apple | Native Apple provider, JWT for RLS |
-| **Database** | Supabase Postgres | Relational fit for sessions, queue, blocks; RLS |
-| **Object storage** | Supabase Storage | Same project, signed URLs, lifecycle rules |
-| **API / logic** | Supabase Edge Functions (Deno/TS) | Matching, upload webhooks, push dispatch |
-| **Scheduled jobs** | `pg_cron` + Edge Function | Session expiry, purge, queue cleanup |
-| **Push** | **APNs HTTP/2 direct** from Edge Function | Silent push for widget; no FCM dependency |
-| **Weather** | WeatherKit on **iOS client** | No server weather API cost; upload summary with photo |
-| **Moderation (MVP)** | Client Vision framework + server report flag | Phase 6 adds hash checking |
+| Layer | Technology | Role |
+|-------|------------|------|
+| **Local DB (iOS)** | Realm Swift SDK (`realm-swift`) | Active session, hour slots, offline cache |
+| **Cloud DB** | MongoDB Atlas (M0 dev / M10 prod) | Sessions, queue, pair history, metadata |
+| **Photo blobs** | **GridFS** on Atlas (or S3 + URL in doc) | JPEG storage, TTL index |
+| **API / logic** | **Atlas Functions** (HTTPS endpoints) | Match, upload, confirm, farewell, purge |
+| **Scheduled jobs** | **Atlas Triggers** (scheduled) | Session expiry, purge, queue cleanup |
+| **Auth** | Sign in with Apple → Atlas App Services Auth *or* custom JWT via Function | Anonymous identity |
+| **Push** | APNs HTTP/2 from Atlas Function | Silent push for widget |
+| **Weather** | WeatherKit on iOS | Client sends summary with upload |
 
-### Why not Firebase as primary?
+### Why MongoDB Atlas for this app?
 
-Firebase is valid for MVP speed, but POV-Stranger's needs map better to Postgres:
+| Fit | Reason |
+|-----|--------|
+| Document model | Session + embedded hour slots map naturally to BSON |
+| TTL indexes | Native `expireAfterSeconds` on `hour_uploads`, GridFS chunks |
+| Flexible schema | Farewell, reports, blocks — add fields without migrations |
+| Atlas Functions | Matching logic in JS/TS, close to data |
+| Realm local | Fast on-device reads for widget + UI (no SwiftData conflict — pick one local store) |
 
-| Need | Supabase | Firebase |
-|------|----------|----------|
-| TTL / scheduled purge | `pg_cron`, SQL deletes | Cloud Functions scheduler + manual deletes |
-| "Never pair again" query | Simple SQL join on `pair_history` | Doable but awkward in Firestore |
-| Row-level security per session | Postgres RLS | Security rules, harder to audit |
-| Cost at ephemeral scale | Storage + egress predictable | Firestore reads add up with polling |
-| Vendor lock-in | Postgres is portable | Firestore is not |
+### Local persistence choice on iOS
 
-**Verdict:** Firebase if you want fastest solo MVP with familiar SDK. **Supabase if you want the architecture to stay clean through Phase 6.**
-
-### Why not Cloudflare R2 + Workers only?
-
-Excellent for **storage cost**, but you'd still need a database for matching, blocks, and session state. Viable as **Phase 4b optimization** (move blobs to R2, keep Supabase Postgres). Not recommended as day-one solo stack — more moving parts.
-
----
-
-## 4. Alternatives considered
-
-| Stack | Pros | Cons | When to pick |
-|-------|------|------|--------------|
-| **Supabase full** | All-in-one, SQL, RLS, good Swift SDK | Edge Functions cold starts | **Default choice** |
-| **Firebase** | Fast setup, FCM built-in | Firestore modeling for ephemeral TTL | Solo hackathon MVP |
-| **Supabase DB + Cloudflare R2** | Cheapest blob storage | Two vendors, signed URL plumbing | >10k DAU, egress pain |
-| **Custom (Fly.io + Postgres + S3)** | Full control | You operate everything | Not for this project |
-| **Parse / Appwrite** | Open source BaaS | Smaller ecosystem | Skip |
+| Option | Recommendation |
+|--------|----------------|
+| SwiftData (current) | Keep for now during mock phase |
+| Realm (target) | **Migrate active session to Realm** when wiring Atlas — single local store for synced session objects |
+| Both long-term | ❌ Avoid dual local DBs |
 
 ---
 
-## 5. System architecture
+## 4. System architecture
 
 ```
-┌─────────────┐         ┌─────────────┐
-│  iOS App A  │         │  iOS App B  │
-│  (Vietnam)  │         │  (Iceland)  │
-└──────┬──────┘         └──────┬──────┘
-       │  Sign in with Apple   │
-       ▼                       ▼
-┌──────────────────────────────────────────┐
-│            Supabase Auth (JWT)            │
-└──────────────────────────────────────────┘
-       │                       │
-       ▼                       ▼
-┌──────────────────────────────────────────┐
-│              Edge Functions               │
-│  ┌────────────┐ ┌──────────┐ ┌─────────┐ │
-│  │ match-queue│ │ upload   │ │ session │ │
-│  │ /enqueue   │ │ /confirm │ │ /expire │ │
-│  └────────────┘ └──────────┘ └─────────┘ │
-└──────────────────────────────────────────┘
-       │            │              │
-       ▼            ▼              ▼
-┌────────────┐ ┌──────────┐ ┌───────────┐
-│  Postgres  │ │ Storage  │ │   APNs    │
-│  (RLS)     │ │ (photos) │ │  (push)   │
-└────────────┘ └──────────┘ └───────────┘
+┌─────────────────────────────────────────────────────────┐
+│                     iOS App                              │
+│  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐ │
+│  │ Realm (local)│  │ HTTPS client │  │ Widget / APNs  │ │
+│  │ active sess  │  │ Atlas Funcs  │  │ handler        │ │
+│  └──────┬──────┘  └──────┬───────┘  └────────────────┘ │
+└─────────┼────────────────┼──────────────────────────────┘
+          │                │
+          │         HTTPS (JWT)
+          ▼                ▼
+┌─────────────────────────────────────────────────────────┐
+│              MongoDB Atlas                               │
+│  ┌──────────────┐  ┌─────────────┐  ┌─────────────────┐ │
+│  │ Collections  │  │   GridFS    │  │ Atlas Functions │ │
+│  │ sessions,    │  │  (photos)   │  │ match, upload,  │ │
+│  │ queue, pairs │  │  TTL 25h    │  │ push, purge     │ │
+│  └──────────────┘  └─────────────┘  └─────────────────┘ │
+│  ┌──────────────┐                                        │
+│  │ Atlas Trigger│  cron: expire sessions, purge blobs   │
+│  └──────────────┘                                        │
+└─────────────────────────────────────────────────────────┘
+          │
+          ▼
+       APNs (Apple)
 ```
 
-### Trust boundaries
+### Sync pattern (post-Device-Sync)
 
-1. **Client** compresses photo, runs on-device moderation (Phase 6), requests signed upload URL
-2. **Edge Function** validates session + hour slot, returns signed URL scoped to `session_id/user_id/hour_N.jpg`
-3. **Storage** object is private; only partner can get signed download URL via RLS-guarded function
-4. **APNs** silent push sent to partner device token after upload confirm
-5. **Cron** deletes DB rows + storage objects after TTL
+Device Sync is **not used**. Instead:
+
+1. **Write:** iOS → HTTPS Function → MongoDB + GridFS
+2. **Read:** iOS polls or receives silent push → HTTPS Function → signed read / JSON + blob
+3. **Cache:** Write response into local Realm → UI + Widget read from Realm
 
 ---
 
-## 6. Data model
+## 5. Data model (MongoDB)
 
-### Entity relationship
+### Collections overview
 
 ```
-users ─────┬──── match_queue
-           ├──── sessions (as user_a or user_b)
-           ├──── device_tokens
-           ├──── blocks
-           └──── pair_history
-
-sessions ──┬──── hour_uploads
-           └──── farewells
+users
+match_queue
+sessions
+hour_uploads          (+ TTL index)
+farewells             (+ TTL index)
+pair_history          ← weekly rematch logic
+blocks
+reports
+device_tokens
 ```
 
-### Tables (Postgres)
+### `users`
 
-#### `users`
+```js
+{
+  _id: ObjectId,           // or auth provider id
+  createdAt: ISODate,
+  countryCode: "VN",       // ISO 3166-1 alpha-2
+  timezoneId: "Asia/Ho_Chi_Minh",
+  lastMatchedAt: ISODate,
+  isBanned: false
+}
+```
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | `uuid` PK | Supabase auth user id |
-| `created_at` | `timestamptz` | |
-| `last_matched_at` | `timestamptz` nullable | Cooldown enforcement |
-| `country_code` | `char(2)` | From client locale / coarse geo |
-| `timezone_id` | `text` | e.g. `Asia/Ho_Chi_Minh` |
-| `is_banned` | `boolean` default false | Admin flag |
-| `match_cooldown_until` | `timestamptz` nullable | Optional: 1 session per 24h |
+### `sessions`
 
-> **No** name, email display, avatar, or precise coordinates.
+```js
+{
+  _id: ObjectId,
+  userA: ObjectId,
+  userB: ObjectId,
+  startedAt: ISODate,
+  expiresAt: ISODate,      // startedAt + 24h
+  status: "active",        // active | farewell | ended | purged
+  userACountry: "VN",
+  userBCountry: "IS",
+  userATimezone: "Asia/Ho_Chi_Minh",
+  userBTimezone: "Atlantic/Reykjavik",
+  isoWeek: 28,             // snapshot at match — for logging
+  isoWeekYear: 2026
+}
+```
 
-#### `device_tokens`
+**Index:** `{ userA: 1, userB: 1, startedAt: -1 }`, `{ expiresAt: 1 }`
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | `uuid` PK | |
-| `user_id` | `uuid` FK → users | |
-| `token` | `text` | APNs device token (hex) |
-| `updated_at` | `timestamptz` | Upsert on app launch |
+### `hour_uploads`
 
-#### `match_queue`
+```js
+{
+  _id: ObjectId,
+  sessionId: ObjectId,
+  userId: ObjectId,
+  hourIndex: 0,            // 0–23
+  gridfsFileId: ObjectId,
+  weatherSummary: "Rain · 28°C",
+  capturedAt: ISODate,
+  createdAt: ISODate       // TTL: expireAfterSeconds = 90000 (25h)
+}
+```
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `user_id` | `uuid` PK FK | One row per waiting user |
-| `enqueued_at` | `timestamptz` | |
-| `country_code` | `char(2)` | For distance scoring |
-| `timezone_id` | `text` | For distance scoring |
+**Unique index:** `{ sessionId: 1, userId: 1, hourIndex: 1 }`
 
-#### `sessions`
+### `farewells`
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | `uuid` PK | |
-| `user_a` | `uuid` FK | Lower uuid canonical order |
-| `user_b` | `uuid` FK | |
-| `started_at` | `timestamptz` | |
-| `expires_at` | `timestamptz` | `started_at + 24h` |
-| `status` | `text` | `active` / `farewell` / `ended` / `purged` |
-| `user_a_country` | `char(2)` | Snapshot at match time |
-| `user_b_country` | `char(2)` | |
-| `user_a_timezone` | `text` | |
-| `user_b_timezone` | `text` | |
+```js
+{
+  _id: ObjectId,
+  sessionId: ObjectId,
+  userId: ObjectId,
+  text: "Chúc mày bình an",   // max 280 chars
+  sentAt: ISODate,
+  deliveredAt: ISODate,
+  createdAt: ISODate          // TTL 25h
+}
+```
 
-#### `hour_uploads`
+**Unique index:** `{ sessionId: 1, userId: 1 }`
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | `uuid` PK | |
-| `session_id` | `uuid` FK | |
-| `user_id` | `uuid` FK | Uploader |
-| `hour_index` | `smallint` | 0–23 |
-| `storage_path` | `text` | `sessions/{id}/{user_id}/{hour}.jpg` |
-| `weather_summary` | `text` nullable | Client-provided snapshot |
-| `captured_at` | `timestamptz` | |
-| `created_at` | `timestamptz` | For TTL purge |
+### `pair_history` — weekly rematch
 
-**Unique constraint:** `(session_id, user_id, hour_index)` — one photo per user per hour.
+```js
+{
+  _id: ObjectId,
+  userA: ObjectId,           // canonical: lower id string first
+  userB: ObjectId,
+  sessionId: ObjectId,
+  matchedAt: ISODate,
+  isoWeek: 28,               // ISO week number (1–53)
+  isoWeekYear: 2026          // year belonging to that ISO week
+}
+```
 
-#### `farewells`
+**Index:** `{ userA: 1, userB: 1, isoWeekYear: 1, isoWeek: 1 }`
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | `uuid` PK | |
-| `session_id` | `uuid` FK | |
-| `user_id` | `uuid` FK | Sender |
-| `text` | `varchar(280)` | |
-| `sent_at` | `timestamptz` | |
-| `delivered_at` | `timestamptz` nullable | Set when partner fetches |
+> Records kept **permanently** (metadata only, no photos). Used for rematch rules + optional "you've met before" UX later.
 
-**Unique constraint:** `(session_id, user_id)` — one farewell per user.
+### `blocks`
 
-#### `pair_history`
+```js
+{ blockerId: ObjectId, blockedId: ObjectId, createdAt: ISODate }
+```
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `user_a` | `uuid` | Canonical order (lower uuid first) |
-| `user_b` | `uuid` | |
-| `session_id` | `uuid` FK | |
-| `matched_at` | `timestamptz` | |
+**Unique:** `{ blockerId: 1, blockedId: 1 }` — block always wins over rematch.
 
-**Unique constraint:** `(user_a, user_b)` — never match again.
+### `match_queue`
 
-#### `blocks`
+```js
+{
+  userId: ObjectId,
+  enqueuedAt: ISODate,
+  countryCode: "VN",
+  timezoneId: "Asia/Ho_Chi_Minh"
+}
+```
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `blocker_id` | `uuid` | |
-| `blocked_id` | `uuid` | |
-| `created_at` | `timestamptz` | |
+---
 
-**Unique constraint:** `(blocker_id, blocked_id)`
+## 6. Local model (Realm on iOS)
 
-#### `reports`
+Mirror active session for fast UI (synced from server responses):
 
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | `uuid` PK | |
-| `reporter_id` | `uuid` | |
-| `session_id` | `uuid` | |
-| `reported_user_id` | `uuid` | |
-| `reason` | `text` | |
-| `created_at` | `timestamptz` | |
+```swift
+class LocalSession: Object {
+    @Persisted(primaryKey: true) var id: String
+    @Persisted var startedAt: Date
+    @Persisted var expiresAt: Date
+    @Persisted var status: String
+    @Persisted var partnerCountryCode: String
+    @Persisted var partnerCountryName: String
+    @Persisted var partnerDistanceKm: Double
+    @Persisted var partnerWeatherSummary: String
+    @Persisted var partnerTimeZoneId: String
+    @Persisted var slots: List<LocalHourSlot>
+}
 
-> Reports may reference purged sessions — store `session_id` + snapshot metadata, not photos.
+class LocalHourSlot: Object {
+    @Persisted var hourIndex: Int
+    @Persisted var myPhotoData: Data?
+    @Persisted var theirPhotoData: Data?
+    @Persisted var myCapturedAt: Date?
+    @Persisted var theirCapturedAt: Date?
+}
+```
+
+**Migration path:** Replace SwiftData `StrangerSession` with Realm when Phase 4 starts, or bridge via `AtlasSessionService` writing to both temporarily.
 
 ---
 
 ## 7. Storage design & TTL
 
-### Bucket structure
+### Photos: GridFS
 
 ```
-photos/                          # Private bucket, no public access
-  sessions/
-    {session_id}/
-      {user_id}/
-        00.jpg
-        01.jpg
-        ...
-        23.jpg
+fs.files / fs.chunks
+  metadata: { sessionId, userId, hourIndex }
 ```
 
-### Upload flow (signed URL)
+**TTL:** Atlas Trigger deletes GridFS files when `session.expiresAt + 1h` passed, or TTL on a shadow `photo_manifest` collection pointing to `fileId`.
 
-1. Client calls `POST /upload/request` with `{ session_id, hour_index, weather_summary }`
-2. Edge Function validates:
-   - User is in session
-   - Hour index matches server-computed slot (or ±1 grace window)
-   - Slot not already uploaded
-3. Returns signed upload URL (PUT, 5 min expiry, max 100 KB)
-4. Client uploads JPEG directly to Storage
-5. Client calls `POST /upload/confirm`
-6. Edge Function writes `hour_uploads` row, sends APNs to partner
+### Purge schedule (Atlas Trigger, every 15 min)
 
-### Download flow
-
-1. Partner calls `GET /partner/latest` or `GET /partner/hour/{n}`
-2. Edge Function verifies session membership
-3. Returns signed download URL (60s expiry) — **not** a permanent link
-
-### TTL / purge strategy
-
-| Layer | Mechanism | Timing |
-|-------|-----------|--------|
-| **Storage objects** | Supabase Storage lifecycle OR cron deletes prefix | `expires_at + 1h` |
-| **hour_uploads rows** | `pg_cron` job | `created_at > 25h` → delete |
-| **farewells** | Delete after both delivered + session ended | `expires_at + 2h` |
-| **sessions** | Status → `purged`, keep row 7d for reports only (no photos) | Configurable |
-| **pair_history** | **Keep forever** (only uuids, no content) | Permanent |
-
-```sql
--- Example purge job (runs every 15 min)
-DELETE FROM hour_uploads WHERE created_at < now() - interval '25 hours';
-DELETE FROM farewells WHERE sent_at < now() - interval '25 hours';
-UPDATE sessions SET status = 'purged'
-  WHERE expires_at < now() - interval '1 hour' AND status != 'purged';
-```
+1. Delete `hour_uploads` where `createdAt < now - 25h` (TTL index handles automatically)
+2. Delete orphaned GridFS files
+3. Set `sessions.status = "purged"` where `expiresAt < now - 1h`
+4. **Keep** `pair_history` forever
 
 ---
 
-## 8. Matching service
+## 8. Matching & weekly rematch rule
 
-### Algorithm (MVP)
+### Product rule: "Có duyên thì gặp lại"
+
+> Same two strangers **may** be paired again — but **not during the same ISO calendar week**.  
+> New week = new chance. Feels like fate, not a permanent block.
+
+### Algorithm
 
 ```
-ON enqueue(user):
-  1. Remove user from any existing queue row
-  2. Find best candidate in match_queue WHERE:
-     - user_id != current
-     - NOT blocked either direction
-     - NOT in pair_history
-     - NOT currently in active session
-  3. Score candidates by timezone_distance (maximize)
-     bonus: different country_code
-  4. IF candidate found:
-     - CREATE session (24h)
-     - INSERT pair_history
-     - DELETE both from match_queue
-     - PUSH both: "matched" notification
-     - RETURN session
-  5. ELSE:
-     - INSERT into match_queue
-     - RETURN waiting
+function canPair(userA, userB):
+  if blocked either direction → false
+  if either in active session → false
+
+  (canonicalA, canonicalB) = sort(userA, userB)
+  currentWeek = isoWeek(now)
+  currentYear = isoWeekYear(now)
+
+  recent = pair_history.findOne({
+    userA: canonicalA,
+    userB: canonicalB,
+    isoWeek: currentWeek,
+    isoWeekYear: currentYear
+  })
+
+  if recent exists → false   // already met this week
+  return true
+
+function enqueue(user):
+  candidate = best match in queue passing canPair()
+  score by timezone distance + different country
+
+  if candidate:
+    create session (24h)
+    insert pair_history { isoWeek, isoWeekYear }
+    remove both from queue
+    push both: session.matched
+  else:
+    add user to match_queue
 ```
 
-### Timezone distance scoring
+### ISO week definition
 
-```ts
-// Pseudo: maximize hour offset between timezones
-function score(userA: QueueEntry, userB: QueueEntry): number {
-  const tzDiff = Math.abs(utcOffset(userA.timezone) - utcOffset(userB.timezone))
-  const countryBonus = userA.country_code !== userB.country_code ? 1000 : 0
-  return tzDiff * 10 + countryBonus
-}
-```
+- Use **ISO 8601 week** (Monday start, week 1 contains first Thursday)
+- Computed in Atlas Function with consistent UTC, or user's timezone — **recommend UTC on server** for fairness
+
+### Optional future UX (not MVP)
+
+- When rematch allowed and happens: subtle UI *"You've crossed paths before"* — no names, no date细节
 
 ### Edge cases
 
-| Case | Decision |
+| Case | Behavior |
 |------|----------|
-| Odd user waiting > 5 min | Widen matching (allow same continent) |
-| Odd user waiting > 15 min | Allow any non-blocked, non-previous pair |
-| User already in active session | Reject enqueue, return existing session |
-| User banned | Reject |
-| Cooldown (1 session / 24h) | **TBD** — recommend yes for abuse prevention |
-| Simulator / dev | `MockSessionService` bypasses all of this |
+| Matched Mon, next match Sun same week | ❌ Blocked |
+| Matched Sun week 28, match Mon week 29 | ✅ Allowed |
+| User blocked partner | ❌ Never (until unblock) |
+| Queue wait > 15 min | Widen timezone scoring |
 
 ---
 
 ## 9. Photo relay flow
 
 ```
-User A captures photo (hour 7)
-        │
-        ▼
-POST /upload/request ──► signed PUT URL
-        │
-        ▼
-PUT photo to Storage (direct, no server proxy)
-        │
-        ▼
-POST /upload/confirm ──► insert hour_uploads
-        │                  send APNs silent → User B
-        ▼
-User B app wakes (background fetch / push handler)
-        │
-        ▼
-GET /partner/latest ──► signed GET URL
-        │
-        ▼
-Download JPEG → WidgetDataStore → WidgetCenter.reloadAllTimelines()
+iOS: compress JPEG (80KB)
+  → POST /upload/request { sessionId, hourIndex, weather }
+  → Function validates slot + session membership
+  → Returns upload token / presigned URL / GridFS upload endpoint
+  → iOS uploads bytes
+  → POST /upload/confirm
+  → Function writes hour_uploads + APNs silent → partner
+  → Partner: GET /partner/latest
+  → Download blob → Realm → WidgetDataStore → widget reload
 ```
 
-### Metadata bundled with upload
-
-Client sends (no precise GPS):
-
-```json
-{
-  "session_id": "uuid",
-  "hour_index": 7,
-  "weather_summary": "Rain · 28°C",
-  "captured_at": "2026-07-13T13:00:00Z"
-}
-```
-
-Partner distance is **computed client-side** from country centroids (already known at match) — server does not need lat/long.
+Server never stores precise GPS — only country/timezone from user profile.
 
 ---
 
 ## 10. Push notifications (APNs)
 
-### Why direct APNs (not FCM)
-
-- iOS-only app
-- Need **silent push** (`content-available: 1`) for widget refresh
-- FCM adds a hop; Apple still delivers via APNs
-- One less vendor
-
-### Notification types
+Same as before — **APNs direct** from Atlas Function (store `.p8` in Atlas Values/Secrets).
 
 | Type | Silent? | When |
 |------|---------|------|
-| `partner.photo` | ✅ Yes | Partner uploaded new hour |
+| `partner.photo` | ✅ | New hour uploaded |
 | `session.matched` | No | Pair found |
-| `session.farewell` | No | T-2h warning |
-| `session.ended` | No | 24h expired |
-| `hourly.reminder` | No | **Keep local** on device (already implemented) |
-
-### Server requirements
-
-- Apple `.p8` key (APNs Auth Key)
-- Store in Supabase secrets
-- Edge Function uses HTTP/2 to `api.push.apple.com`
-- Device token registered on app launch via `POST /device-token`
-
-### Payload example (silent)
-
-```json
-{
-  "aps": {
-    "content-available": 1
-  },
-  "pov": {
-    "type": "partner.photo",
-    "session_id": "...",
-    "hour_index": 7
-  }
-}
-```
+| `session.farewell` | No | T-2h |
+| `session.ended` | No | 24h up |
+| Hourly reminder | No | **Local only** (already on iOS) |
 
 ---
 
 ## 11. Auth & identity
 
-### Sign in with Apple → Supabase
+### Sign in with Apple → Atlas
 
-```
-iOS: AuthenticationServices → identity token
-     → supabase.auth.signInWithIdToken(provider: .apple)
-     → JWT stored in Keychain
-     → All API calls: Authorization: Bearer <jwt>
-```
+**Option A (preferred if Auth still works on your Atlas project):**  
+Atlas App Services Authentication — Apple provider → user JWT for Functions.
 
-### What we store about users
+**Option B (fallback):**  
+Verify Apple identity token in Atlas Function → issue custom session token → MongoDB `users` upsert.
 
-| Stored | Not stored |
-|--------|------------|
-| Anonymous `user.id` (uuid) | Real name |
-| Country code (self-reported / locale) | Email (Supabase may have it from Apple; don't expose) |
-| Timezone | Apple user identifier in app UI |
-| APNs token | Profile photo |
+### Stored per user
 
-### Row Level Security (RLS) principles
-
-- Users can **read** only their own active session
-- Users can **read** partner's `hour_uploads` only for their shared `session_id`
-- Users can **insert** uploads only for their own `user_id` + valid session
-- **No** client direct access to `match_queue` — Edge Functions only
-- **No** public Storage bucket
+✅ Anonymous `userId`, country, timezone, APNs token  
+❌ Name, email in app, precise location
 
 ---
 
-## 12. Security, moderation & abuse
+## 12. Security & moderation
 
-### MVP (Phase 4 — minimal)
-
-- [ ] Signed URLs only, short expiry
-- [ ] RLS on all tables
-- [ ] Rate limit: max 1 upload per hour per session (DB constraint)
-- [ ] Max file size 100 KB at Storage policy level
-
-### Required before App Store (Phase 6)
-
-- [ ] Client-side sensitive content (`VNClassifyImageRequest` or similar)
-- [ ] Report → `reports` table + instant block + session terminate
-- [ ] Server CSAM hash check (PhotoDNA API or Apple CSAM API when available)
-- [ ] Ban hammer for repeat reporters / reportees
-- [ ] Age gate 17+
-
-### Abuse vectors
-
-| Vector | Mitigation |
-|--------|------------|
-| Spam uploads | Unique constraint + rate limit |
-| Harassment via photos | Report + block + ban |
-| Stalking via metadata | Country-level only, no GPS |
-| Bot farming | Sign in with Apple + cooldown |
-| Scraping | Signed URLs, no public bucket |
+Same as prior plan — report, block, client Vision check, CSAM before App Store.  
+**Block always overrides weekly rematch.**
 
 ---
 
 ## 13. iOS client integration
 
-### Protocol-based service layer
+### Dependencies
+
+```swift
+// Package.swift / SPM
+.package(url: "https://github.com/realm/realm-swift", from: "10.54.0")
+```
+
+### Service protocol (unchanged pattern)
 
 ```swift
 protocol SessionServiceProtocol {
@@ -536,152 +463,97 @@ protocol SessionServiceProtocol {
     func submitPhoto(_ data: Data, hourIndex: Int, weather: String) async throws
     func fetchPartnerPhoto(hourIndex: Int?) async throws -> Data?
     func submitFarewell(_ text: String) async throws
-    func pollSessionStatus() async throws -> SessionStatus
 }
 
-final class MockSessionService: SessionServiceProtocol { /* current behavior */ }
-final class SupabaseSessionService: SessionServiceProtocol { /* Phase 4 */ }
+final class AtlasSessionService: SessionServiceProtocol { /* HTTPS → Functions */ }
+final class MockSessionService: SessionServiceProtocol { /* current */ }
 ```
 
-### App wiring
+### Config (gitignored `Secrets.xcconfig`)
 
-```swift
-#if DEBUG
-let sessionService: SessionServiceProtocol = useMock ? MockSessionService() : SupabaseSessionService()
-#else
-let sessionService: SessionServiceProtocol = SupabaseSessionService()
-#endif
 ```
-
-### New iOS dependencies
-
-| Package | Purpose |
-|---------|---------|
-| `supabase-swift` | Auth, REST, Storage, Functions |
-| (existing) | WeatherKit, UserNotifications, WidgetKit |
-
-### Background modes (Info.plist)
-
-- `remote-notification` — for silent push photo fetch
-- No `location` background needed
+ATLAS_APP_ID = ...
+ATLAS_FUNCTION_BASE_URL = https://...mongodb.net/api/client/v2.0/app/.../functions/call
+MONGODB_ATLAS_GROUP_ID = ...
+```
 
 ---
 
 ## 14. Environments & secrets
 
-| Env | Supabase project | Storage bucket | APNs |
-|-----|------------------|----------------|------|
-| `dev` | `pov-stranger-dev` | `photos-dev` | Sandbox APNs |
-| `staging` | `pov-stranger-stg` | `photos-stg` | Sandbox APNs |
-| `prod` | `pov-stranger-prod` | `photos` | Production APNs |
+| Env | Atlas cluster | Functions |
+|-----|---------------|-----------|
+| `dev` | M0 free tier | `pov-stranger-dev` |
+| `prod` | M10+ | `pov-stranger-prod` |
 
-### Secrets (never in repo)
-
-```
-SUPABASE_URL
-SUPABASE_ANON_KEY          # iOS app — RLS protects data
-SUPABASE_SERVICE_ROLE_KEY  # Edge Functions only
-APNS_KEY_ID
-APNS_TEAM_ID
-APNS_PRIVATE_KEY           # .p8 contents
-```
-
-### iOS config
-
-Use `xcconfig` files (gitignored) or Xcode build settings:
-
-```
-SUPABASE_URL = https://xxx.supabase.co
-SUPABASE_ANON_KEY = eyJ...
-```
+Secrets: `APNS_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID`, Apple Services ID
 
 ---
 
 ## 15. Cost model
 
-### Assumptions: 1,000 active pairs/day (2,000 DAU)
-
-| Resource | Daily volume | Monthly est. |
+| Resource | 1k pairs/day | Monthly est. |
 |----------|--------------|--------------|
-| Photo storage (peak) | ~4 GB (25h retention) | ~$0.10 (Supabase 100GB included) |
-| Photo uploads | 48k files × 80KB ≈ 3.8 GB/day transfer | Within free tier initially |
-| Postgres | < 1M rows/month | Free tier |
-| Edge Functions | ~100k invocations/month | Free tier |
+| M0 cluster | Dev | $0 |
+| M10 prod | Production | ~$57/mo (or M2 ~$9) |
+| GridFS storage | ~4 GB peak | Included in cluster |
+| Functions invocations | ~150k/mo | Low / included |
 | APNs | Free | $0 |
 
-**MVP estimate: $0–25/month** until ~10k DAU.
-
-### When to add Cloudflare R2
-
-When Supabase Storage egress exceeds ~$20/month — migrate blobs to R2, keep Postgres on Supabase. Photos are short-lived so migration is straightforward.
+**MVP dev: $0.** Production: **~$10–60/mo** depending on cluster tier.
 
 ---
 
 ## 16. Implementation phases
 
-### 4a — Foundation (week 1)
+### 4a — Atlas setup
+- [ ] MongoDB Atlas project + cluster
+- [ ] Collections + indexes + TTL
+- [ ] GridFS bucket config
+- [ ] Realm Swift SDK added to Xcode
 
-- [ ] Create Supabase project (dev)
-- [ ] Run SQL migrations (tables + RLS)
-- [ ] Sign in with Apple working on iOS
-- [ ] `SupabaseSessionService` skeleton
-- [ ] Device token registration
+### 4b — Auth
+- [ ] Sign in with Apple
+- [ ] User upsert in `users`
+- [ ] `device_tokens` registration
 
-### 4b — Matching (week 1–2)
+### 4c — Matching
+- [ ] `matchEnqueue` Function + weekly `canPair` check
+- [ ] `pair_history` with `isoWeek` / `isoWeekYear`
+- [ ] iOS replace mock `findMatch`
 
-- [ ] `match-queue/enqueue` Edge Function
-- [ ] Pair algorithm + `pair_history`
-- [ ] iOS: replace mock `findMatch` with real
+### 4d — Photo relay
+- [ ] GridFS upload/download Functions
+- [ ] APNs silent push on confirm
+- [ ] Realm local cache + widget
 
-### 4c — Photo relay (week 2)
-
-- [ ] Signed upload/download URLs
-- [ ] `upload/confirm` → APNs silent push
-- [ ] iOS background handler → download → widget
-
-### 4d — Farewell & expiry (week 2–3)
-
-- [ ] `farewells` send + fetch once
-- [ ] `session/expire` cron job
-- [ ] Purge Storage + DB
-
-### 4e — Hardening (week 3)
-
-- [ ] Report + block endpoints
-- [ ] Rate limits
-- [ ] Staging environment
-- [ ] TestFlight two-device test
+### 4e — Lifecycle
+- [ ] Farewell send/fetch
+- [ ] Scheduled purge Trigger
+- [ ] Report + block
 
 ---
 
-## 17. Open product decisions
-
-| # | Question | Recommendation | Status |
-|---|----------|----------------|--------|
-| 1 | Supabase vs Firebase? | **Supabase** | ✅ Recommended |
-| 2 | 1 session per user per 24h cooldown? | **Yes** — reduces abuse | ⏳ Confirm |
-| 3 | Farewell visible before session ends? | **No** — only after `ended` | ⏳ Confirm |
-| 4 | Store session row after purge for reports? | **Yes** — metadata only, 30 days | ⏳ Confirm |
-| 5 | Weather from client or server? | **Client (WeatherKit)** | ✅ Recommended |
-| 6 | Odd user out > 15 min? | Widen match criteria | ✅ Recommended |
-| 7 | Android later? | Skip for MVP; Supabase still works | ⏳ Confirm |
-
----
-
-## Decision log update
+## 17. Decision log
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-07-13 | Backend: **Supabase** (Postgres + Storage + Edge Functions) | Ephemeral TTL, RLS, matching queries, cost |
-| 2026-07-13 | Push: **APNs direct** | Silent push for widget, iOS-only |
-| 2026-07-13 | Weather: **client-side WeatherKit** | No server API cost |
-| 2026-07-13 | Storage path: `sessions/{id}/{user_id}/{hour}.jpg` | Simple purge by prefix |
-| 2026-07-13 | Retention: **25h** for photos, permanent `pair_history` | Ephemeral content, rematch prevention |
+| 2026-07-13 | ~~Supabase~~ → **MongoDB Atlas** | User choice; document model + TTL fit |
+| 2026-07-13 | **Realm local** (no Device Sync) | Device Sync EOL Sept 2025; Realm local still viable |
+| 2026-07-13 | Photos in **GridFS** | Native MongoDB blob storage + TTL |
+| 2026-07-13 | Rematch: **allowed after new ISO week** | "Có duyên thì gặp lại" — not same week |
+| 2026-07-13 | `pair_history` kept permanently | Weekly check only; metadata, no photos |
+| 2026-07-13 | Block > rematch | Safety override |
+| 2026-07-13 | Weather: client WeatherKit | No server cost |
+| 2026-07-13 | Push: APNs direct from Functions | Silent widget refresh |
 
 ---
 
 ## Next step
 
-Once product decisions in §17 are confirmed, start **Phase 4a**: Supabase project + SQL migration + Sign in with Apple.
+1. Create MongoDB Atlas cluster (M0)
+2. Define collections + TTL indexes
+3. Implement `canPair()` with ISO week check
+4. Add Realm + `AtlasSessionService` on iOS
 
-See [`PLAN.md` → Phase 4](PLAN.md#phase-4--backend-relay) for iOS task checklist.
+See [`PLAN.md` → Phase 4](PLAN.md#phase-4--backend-relay).
