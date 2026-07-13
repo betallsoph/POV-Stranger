@@ -458,7 +458,7 @@ POV-Stranger/
 | 2026-07-13 | Storage | GridFS, TTL 25h |
 | 2026-07-13 | Rematch rule | **Same week blocked; new ISO week allowed** ("có duyên thì gặp lại") |
 | 2026-07-13 | Timezone | **UTC** server + rematch week; partner TZ for display; device local for notifications |
-| 2026-07-13 | Device Sync | **Not used** — EOL Sept 2025; HTTPS Functions instead |
+| 2026-07-13 | Backend language | **Atlas Functions (JS)** for MVP; Go API + Atlas DB if scaling later |
 
 ---
 

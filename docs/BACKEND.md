@@ -533,6 +533,7 @@ Secrets: `APNS_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID`, Apple Services ID
 | 2026-07-13 | Weather: client WeatherKit | No server cost |
 | 2026-07-13 | Push: APNs direct from Functions | Silent widget refresh |
 | 2026-07-13 | **Timezone policy** | Store UTC; rematch week in UTC; display partner local; notifications device-local |
+| 2026-07-13 | **Backend language** | **JS (Atlas Functions) for now**; revisit Go API if scale requires it |
 
 ---
 
