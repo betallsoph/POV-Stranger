@@ -245,10 +245,14 @@ enum SessionStatus: String, Codable {
 - [x] `Secrets.xcconfig.example` + `.gitignore`
 
 ### 4.2 Auth
-- [ ] Sign in with Apple
-- [ ] Atlas user + `users` collection upsert
-- [x] `registerDeviceToken` function scaffold
-- [ ] `device_tokens` on launch (iOS)
+- [x] Sign in with Apple (iOS — `AppleSignInService`, `AuthManager`)
+- [x] Atlas auth client (`AtlasAuthClient` → Apple provider login)
+- [x] `AtlasAuthTokenStore` (access + refresh tokens)
+- [x] Auth gate UI on waiting screen when cloud configured
+- [x] `AppDelegate` + `DeviceTokenRegistrar` scaffold
+- [ ] Enable Apple provider in Atlas (manual)
+- [ ] Enable capability in Apple Developer (manual)
+- [ ] `device_tokens` end-to-end after deploy
 
 ### 4.3 Matching
 - [x] `matchEnqueue` Atlas Function (code in repo)
@@ -267,8 +271,8 @@ enum SessionStatus: String, Codable {
 - [x] `SessionServiceProtocol` + `SessionServiceFactory`
 - [x] `AtlasHTTPClient` + `AtlasConfig`
 - [x] `SessionManager` async refactor
-- [ ] Background `remote-notification` handler
-- [ ] Sign in with Apple → `AtlasAuthTokenStore`
+- [x] Background `remote-notification` mode in Info.plist
+- [x] Sign in with Apple → `AtlasAuthTokenStore`
 
 ### 4.6 Purge
 - [ ] TTL indexes on `hour_uploads`, `farewells`

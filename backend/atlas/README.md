@@ -38,7 +38,7 @@ Copy each file from `backend/atlas/functions/` into Atlas App Services → Funct
 
 Link cluster data source name: `mongodb-atlas` (default).
 
-## 4. HTTPS endpoints
+## 5. iOS secrets
 
 For each function, create an HTTPS Endpoint (authenticated) in App Services:
 
@@ -70,15 +70,34 @@ Keys:
 | Key | Description |
 |-----|-------------|
 | `ATLAS_ENDPOINT_BASE` | HTTPS endpoint base URL (no trailing slash) |
-| `ATLAS_APP_ID` | App Services app id (optional, for logging) |
+| `ATLAS_APP_ID` | App Services App ID (required for Sign in with Apple) |
 
-When `ATLAS_ENDPOINT_BASE` is empty, iOS uses **MockSessionService** automatically.
+When `ATLAS_ENDPOINT_BASE` is empty, iOS uses **MockSessionService** (no sign-in required).
 
-## 6. Auth (Phase 4b)
+When **both** keys are set, iOS requires **Sign in with Apple** before matching.
 
-Enable **Sign in with Apple** in App Services Authentication, then pass JWT from iOS in `Authorization: Bearer <token>` header.
+## 6. Auth — Sign in with Apple
 
-Functions read `context.user.id` as MongoDB user id.
+### Apple Developer (mày làm)
+
+1. [developer.apple.com](https://developer.apple.com) → Identifiers → `antt.POV-Stranger`
+2. Enable **Sign in with Apple** capability
+3. Xcode → Target → Signing & Capabilities → verify capability added
+
+### Atlas App Services
+
+1. App Services → **Authentication** → Enable **Apple**
+2. Set bundle ID: `antt.POV-Stranger`
+3. Copy **App ID** → paste into `ATLAS_APP_ID` in `Secrets.xcconfig`
+
+### iOS flow (đã code sẵn)
+
+1. User taps Sign in with Apple
+2. App gets Apple `identityToken` → POST to Atlas auth API
+3. Atlas returns `access_token` → stored in Keychain/UserDefaults
+4. All function calls send `Authorization: Bearer <token>`
+
+Functions use `context.user.id` as the MongoDB user id.
 
 ## Collections
 
