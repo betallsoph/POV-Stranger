@@ -135,8 +135,8 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				A10000070000000000000001 /* POVStrangerWidget */,
 				A10000060000000000000001 /* Shared */,
+				A10000070000000000000001 /* POVStrangerWidget */,
 			);
 			name = POVStrangerWidget;
 			packageProductDependencies = (
@@ -355,6 +355,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ATLAS_APP_ID = "";
+				INFOPLIST_KEY_ATLAS_ENDPOINT_BASE = "";
 				INFOPLIST_KEY_NSCameraUsageDescription = "POV-Stranger needs camera access to share one photo per hour with your anonymous stranger.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "POV-Stranger can use a photo from your library for this hour's exchange.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -389,6 +391,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ATLAS_APP_ID = "";
+				INFOPLIST_KEY_ATLAS_ENDPOINT_BASE = "";
 				INFOPLIST_KEY_NSCameraUsageDescription = "POV-Stranger needs camera access to share one photo per hour with your anonymous stranger.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "POV-Stranger can use a photo from your library for this hour's exchange.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

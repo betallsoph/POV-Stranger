@@ -36,7 +36,7 @@ struct ActiveSessionView: View {
 
                 if session.status == .farewell {
                     FarewellComposeView(text: $farewellText) {
-                        sendFarewell()
+                        Task { await sendFarewell() }
                     }
                 }
 
@@ -60,7 +60,14 @@ struct ActiveSessionView: View {
         }
         .sheet(isPresented: $showingCapture) {
             CapturePhotoView { imageData in
-                try? sessionManager.submitPhoto(imageData, for: session, context: modelContext)
+                Task {
+                    try? await sessionManager.submitPhoto(
+                        imageData,
+                        weatherSummary: session.partnerWeatherSummary,
+                        for: session,
+                        context: modelContext
+                    )
+                }
             }
         }
         .onAppear {
@@ -83,8 +90,8 @@ struct ActiveSessionView: View {
         try? sessionManager.refreshSessionStatus(session, context: modelContext)
     }
 
-    private func sendFarewell() {
-        try? sessionManager.submitFarewell(farewellText, for: session, context: modelContext)
+    private func sendFarewell() async {
+        try? await sessionManager.submitFarewell(farewellText, for: session, context: modelContext)
         farewellText = ""
     }
 
@@ -97,8 +104,9 @@ struct ActiveSessionView: View {
                 .foregroundStyle(.secondary)
 
             Button("Simulate partner photo") {
-                let data = Data([0x01, 0x02, 0x03])
-                try? sessionManager.submitPhoto(data, for: session, context: modelContext)
+                Task {
+                    try? await sessionManager.debugSimulatePartnerPhoto(session, context: modelContext)
+                }
             }
             .buttonStyle(.bordered)
 

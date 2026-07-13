@@ -5,26 +5,28 @@ import Observation
 @Observable
 @MainActor
 final class SessionManager {
+    private let sessionService: SessionServiceProtocol
     private(set) var isMatching = false
 
-    func findMatch(context: ModelContext) throws -> StrangerSession {
+    var isCloudBacked: Bool { sessionService.isCloudBacked }
+
+    init(sessionService: SessionServiceProtocol? = nil) {
+        self.sessionService = sessionService ?? SessionServiceFactory.make()
+    }
+
+    func findMatch(context: ModelContext) async throws -> StrangerSession {
         isMatching = true
         defer { isMatching = false }
 
-        let partner = MockPartner.random()
-        let session = StrangerSession(
-            partnerDistanceKm: partner.distanceKm,
-            partnerCountryCode: partner.countryCode,
-            partnerCountryName: partner.countryName,
-            partnerWeatherSummary: partner.weatherSummary,
-            partnerTimeZoneIdentifier: partner.timeZoneIdentifier
-        )
-
-        context.insert(session)
-        try context.save()
-        WidgetDataStore.update(from: session)
-        Task { await HourlyReminderScheduler.schedule(for: session) }
-        return session
+        switch try await sessionService.findMatch(context: context) {
+        case .matched(let remote):
+            let session = try StrangerSession.upsert(from: remote, in: context)
+            WidgetDataStore.update(from: session)
+            await HourlyReminderScheduler.schedule(for: session)
+            return session
+        case .waiting:
+            throw SessionServiceError.waitingForStranger
+        }
     }
 
     func refreshSessionStatus(_ session: StrangerSession, context: ModelContext) throws {
@@ -40,38 +42,21 @@ final class SessionManager {
 
     func submitPhoto(
         _ imageData: Data,
+        weatherSummary: String,
         for session: StrangerSession,
         context: ModelContext
-    ) throws {
-        let hourIndex = session.currentHourIndex
-        guard let slot = session.slot(for: hourIndex) else { return }
-
-        slot.myPhotoData = imageData
-        slot.myCapturedAt = .now
-
-        // Simulate partner response in development.
-        if slot.theirPhotoData == nil {
-            let partner = MockPartner(
-                countryCode: session.partnerCountryCode,
-                countryName: session.partnerCountryName,
-                distanceKm: session.partnerDistanceKm,
-                weatherSummary: session.partnerWeatherSummary,
-                timeZoneIdentifier: session.partnerTimeZoneIdentifier
-            )
-            slot.theirPhotoData = partner.placeholderPhotoData(for: hourIndex)
-            slot.theirCapturedAt = .now.addingTimeInterval(5)
-        }
-
-        try context.save()
+    ) async throws {
+        try await sessionService.submitPhoto(
+            imageData,
+            weatherSummary: weatherSummary,
+            for: session,
+            context: context
+        )
         WidgetDataStore.update(from: session)
     }
 
-    func submitFarewell(_ text: String, for session: StrangerSession, context: ModelContext) throws {
-        let trimmed = String(text.prefix(280))
-        guard !trimmed.isEmpty, session.myFarewellText == nil else { return }
-        session.myFarewellText = trimmed
-        session.theirFarewellText = "Thank you for sharing your world today."
-        try context.save()
+    func submitFarewell(_ text: String, for session: StrangerSession, context: ModelContext) async throws {
+        try await sessionService.submitFarewell(text, for: session, context: context)
     }
 
     func endSession(_ session: StrangerSession, context: ModelContext) throws {
@@ -98,6 +83,11 @@ final class SessionManager {
         let hoursElapsed = session.currentHourIndex + 1
         session.startedAt = Date.now.addingTimeInterval(-Double(hoursElapsed) * 3600)
         try refreshSessionStatus(session, context: context)
+    }
+
+    func debugSimulatePartnerPhoto(_ session: StrangerSession, context: ModelContext) async throws {
+        let data = Data([0x01, 0x02, 0x03])
+        try await submitPhoto(data, weatherSummary: session.partnerWeatherSummary, for: session, context: context)
     }
     #endif
 

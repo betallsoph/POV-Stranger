@@ -46,7 +46,9 @@ struct RootView: View {
         Task {
             _ = await HourlyReminderScheduler.requestAuthorization()
             do {
-                _ = try sessionManager.findMatch(context: modelContext)
+                _ = try await sessionManager.findMatch(context: modelContext)
+            } catch let error as SessionServiceError {
+                matchError = error.errorDescription
             } catch {
                 matchError = error.localizedDescription
             }
