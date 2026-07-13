@@ -1,0 +1,9 @@
+# Xcode
+*.xcuserstate
+xcuserdata/
+
+# Secrets — never commit
+Config/Secrets.xcconfig
+
+# DerivedData (if local)
+DerivedData/
