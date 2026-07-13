@@ -28,10 +28,10 @@ Anonymous 24-hour photo exchange with a random stranger on the other side of the
 | UI | SwiftUI (iOS 26, Liquid Glass) |
 | Persistence | SwiftData (active session only, ephemeral) |
 | Widget | WidgetKit + App Groups *(planned)* |
-| Auth | Sign in with Apple *(planned)* |
-| Backend | Supabase / Firebase relay *(planned)* |
-| Weather | WeatherKit |
-| Push | APNs silent push for widget refresh *(planned)* |
+| Auth | Sign in with Apple → Supabase Auth |
+| Backend | **Supabase** (Postgres + Edge Functions) — see [`docs/BACKEND.md`](docs/BACKEND.md) |
+| Storage | Supabase Storage (private, 25h TTL, signed URLs) |
+| Push | APNs direct (silent push for widget) |
 
 ## Project location
 
@@ -88,7 +88,8 @@ POV-Stranger/
 ├── POVStrangerWidget/       # Home Screen widget extension
 ├── Shared/                  # App Group types shared with widget
 ├── docs/
-│   └── PLAN.md              # Detailed implementation plan + checklist
+│   ├── PLAN.md              # Implementation checklist
+│   └── BACKEND.md           # Backend & storage architecture
 └── README.md                # This file
 ```
 

@@ -219,49 +219,62 @@ enum SessionStatus: String, Codable {
 
 ## Phase 4 — Backend relay
 
-> Goal: Two real devices can match and exchange photos.
+> Goal: Two real devices can match and exchange photos.  
+> **Read [`docs/BACKEND.md`](BACKEND.md) first** — full architecture, schema, storage TTL, and stack decision.
 
-### 4.1 Choose backend
-- [ ] Decision: Supabase vs Firebase (see [Decision log](#decision-log))
-- [ ] Create project + env config
+### Stack decision (2026-07-13)
+
+| Layer | Choice |
+|-------|--------|
+| BaaS | **Supabase** (Postgres + Storage + Edge Functions) |
+| Auth | Sign in with Apple → Supabase Auth JWT |
+| Photo storage | Supabase Storage, private bucket, signed URLs, 25h TTL |
+| Push | APNs HTTP/2 direct from Edge Functions |
+| Weather | WeatherKit on iOS client (not server) |
+
+### 4.1 Setup
+- [ ] Decision recorded in BACKEND.md ✅
+- [ ] Create Supabase dev project
+- [ ] SQL migrations (see BACKEND.md §6)
+- [ ] iOS `xcconfig` for secrets (gitignored)
 
 ### 4.2 Auth
-- [ ] Sign in with Apple
-- [ ] Anonymous user ID (no profile, no name)
+- [ ] Sign in with Apple on iOS
+- [ ] Supabase `signInWithIdToken`
+- [ ] `device_tokens` upsert on launch
 
-### 4.3 Database schema (Supabase example)
+### 4.3 Matching
+- [ ] `match-queue/enqueue` Edge Function
+- [ ] Timezone-distance scoring + `pair_history`
+- [ ] Block / cooldown checks
 
-```sql
--- users: apple_user_id, created_at, last_matched_at, blocked_countries[]
+### 4.4 Photo relay
+- [ ] Signed upload URL flow
+- [ ] `upload/confirm` → APNs silent push
+- [ ] Partner download → widget refresh
 
--- match_queue: user_id, enqueued_at, timezone, country_code
+### 4.5 iOS integration
+- [ ] `SessionServiceProtocol` + `SupabaseSessionService`
+- [ ] Keep `MockSessionService` for previews
+- [ ] Background `remote-notification` handler
 
--- sessions: id, user_a, user_b, started_at, expires_at, status
-
--- hour_uploads: session_id, user_id, hour_index, photo_url, captured_at
-  -- TTL: auto-delete after 25h via pg_cron or bucket lifecycle
-
--- farewells: session_id, user_id, text, sent_at
-  -- delivered once to partner, then deleted
-```
-
-### 4.4 Matching service
-- [ ] Enqueue on "Find stranger"
-- [ ] Pair users maximizing timezone distance
-- [ ] Prevent rematch (same pair ever)
-- [ ] Edge case: odd user out → wait or bot? (document choice)
-
-### 4.5 Photo relay
-- [ ] Upload compressed JPEG to storage bucket
-- [ ] Notify partner via APNs silent push
-- [ ] Partner app downloads → updates widget
-- [ ] No long-term storage — bucket lifecycle 25h
-
-### 4.6 Replace mock
-- [ ] `SessionManager` uses `BackendSessionService` protocol
-- [ ] `MockSessionService` kept for simulator / previews
+### 4.6 Purge
+- [ ] `pg_cron` purge job (25h)
+- [ ] Storage prefix delete on session end
 
 **Phase 4 done when:** Two TestFlight devices match, exchange photos for 1+ hours, receive push updates.
+
+---
+
+## Phase 4 (legacy notes — superseded by BACKEND.md)
+
+<details>
+<summary>Old Supabase schema sketch (click to expand)</summary>
+
+```sql
+-- See docs/BACKEND.md for full schema with RLS, indexes, and constraints
+```
+</details>
 
 ---
 
@@ -425,8 +438,10 @@ POV-Stranger/
 | 2026-07-13 | Farewell window = last 2 hours | Enough time without rushing |
 | 2026-07-13 | Mock partner first, backend later | Unblock UI development |
 | 2026-07-13 | SwiftData for local session | Native, fits ephemeral on-device cache |
-| TBD | Supabase vs Firebase | Supabase: Postgres + RLS + TTL cron. Firebase: faster setup, pricier at scale |
+| TBD | Supabase vs Firebase | **Decided: Supabase** — see `docs/BACKEND.md` |
 | TBD | Exact photo compression target | Start 800px / 80KB JPEG, tune with real uploads |
+| 2026-07-13 | Backend stack | Supabase + APNs direct + WeatherKit client-side |
+| 2026-07-13 | Storage TTL | 25h; `pair_history` kept permanently (uuid only) |
 
 ---
 
