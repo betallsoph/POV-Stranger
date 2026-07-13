@@ -1,10 +1,3 @@
-//
-//  POV_StrangerApp.swift
-//  POV-Stranger
-//
-//  Created by An T. Tran on 7/13/26.
-//
-
 import SwiftUI
 import SwiftData
 
@@ -12,7 +5,8 @@ import SwiftData
 struct POV_StrangerApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            StrangerSession.self,
+            HourSlot.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -25,7 +19,8 @@ struct POV_StrangerApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .environment(SessionManager())
         }
         .modelContainer(sharedModelContainer)
     }
