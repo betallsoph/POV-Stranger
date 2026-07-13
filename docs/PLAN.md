@@ -238,22 +238,25 @@ enum SessionStatus: String, Codable {
 > ℹ️ No Realm / Device Sync — SwiftData local + Atlas HTTPS. See [`BACKEND.md`](BACKEND.md).
 
 ### 4.1 Setup
-- [ ] MongoDB Atlas M0 cluster
-- [ ] Collections + TTL indexes (see BACKEND.md §5)
-- [ ] GridFS for photos
-- [ ] SwiftData models already in app ✅
-- [ ] `Secrets.xcconfig` (gitignored)
+- [ ] MongoDB Atlas M0 cluster (manual — see `backend/atlas/README.md`)
+- [x] Collections + TTL indexes script (`backend/atlas/schema/init-indexes.js`)
+- [ ] GridFS for photos (Phase 4c)
+- [x] SwiftData models + `remoteSessionId`
+- [x] `Secrets.xcconfig.example` + `.gitignore`
 
 ### 4.2 Auth
 - [ ] Sign in with Apple
 - [ ] Atlas user + `users` collection upsert
-- [ ] `device_tokens` on launch
+- [x] `registerDeviceToken` function scaffold
+- [ ] `device_tokens` on launch (iOS)
 
 ### 4.3 Matching
-- [ ] `matchEnqueue` Atlas Function
-- [ ] **Weekly rematch:** block same pair in same ISO week; allow next week
-- [ ] `pair_history` with `isoWeek` + `isoWeekYear`
-- [ ] Block list overrides rematch
+- [x] `matchEnqueue` Atlas Function (code in repo)
+- [x] **Weekly rematch:** ISO week UTC in `canPair.js`
+- [x] `pair_history` with `isoWeek` + `isoWeekYear`
+- [x] Block list check in `canPair.js`
+- [x] iOS `AtlasSessionService.findMatch` + `MockSessionService` fallback
+- [ ] Deploy function + HTTPS endpoint (manual)
 
 ### 4.4 Photo relay
 - [ ] GridFS upload via Function
@@ -261,9 +264,11 @@ enum SessionStatus: String, Codable {
 - [ ] SwiftData cache + widget update
 
 ### 4.5 iOS integration
-- [ ] `SessionServiceProtocol` + `AtlasSessionService`
-- [ ] `AtlasSessionService` → existing SwiftData models
-- [ ] Keep `MockSessionService` for previews
+- [x] `SessionServiceProtocol` + `SessionServiceFactory`
+- [x] `AtlasHTTPClient` + `AtlasConfig`
+- [x] `SessionManager` async refactor
+- [ ] Background `remote-notification` handler
+- [ ] Sign in with Apple → `AtlasAuthTokenStore`
 
 ### 4.6 Purge
 - [ ] TTL indexes on `hour_uploads`, `farewells`
