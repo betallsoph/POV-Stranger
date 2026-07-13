@@ -176,9 +176,11 @@ enum SessionStatus: String, Codable {
 - [x] `SessionManager.submitPhoto(_:image:for:)` — save to current hour slot
 
 ### 2.3 Hourly prompts (local only)
-- [ ] `Services/HourlyReminderScheduler.swift` — `UNUserNotificationCenter`
-- [ ] Schedule 24 notifications per session (or rolling next-hour)
-- [ ] Cancel on session end
+- [x] `Services/HourlyReminderScheduler.swift` — `UNUserNotificationCenter`
+- [x] Schedule remaining hour notifications per session
+- [x] Farewell reminder at T-2h
+- [x] Cancel on session end
+- [x] Request permission on find match
 
 ### 2.4 Mock partner photos
 - [ ] `MockPartner.randomPhoto()` — placeholder images from assets or SF Symbol composite
@@ -193,20 +195,20 @@ enum SessionStatus: String, Codable {
 > Goal: Home Screen widget shows partner's latest photo + metadata.
 
 ### 3.1 Xcode target setup
-- [ ] Add **Widget Extension** target: `POVStrangerWidget`
-- [ ] Add **App Group**: `group.antt.POV-Stranger`
-- [ ] Shared `Shared/WidgetSnapshot.swift` (or duplicate minimal struct)
+- [x] Add **Widget Extension** target: `POVStrangerWidget`
+- [x] Add **App Group**: `group.antt.POV-Stranger`
+- [x] Shared `Shared/WidgetSnapshot.swift`
 
 ### 3.2 Widget data flow
-- [ ] `Services/WidgetDataStore.swift` — write snapshot to App Group `UserDefaults` or file
-- [ ] Snapshot fields: `theirPhotoData`, `distanceKm`, `weather`, `localTime`, `hourIndex`, `expiresAt`
-- [ ] Call `WidgetCenter.shared.reloadAllTimelines()` on photo receive
+- [x] `Services/WidgetDataStore.swift` — write snapshot to App Group
+- [x] Snapshot fields: photo file, distance, weather, time, hour, expires
+- [x] Call `WidgetCenter.shared.reloadAllTimelines()` on photo receive
 
 ### 3.3 Widget UI
-- [ ] `POVStrangerWidget.swift` — `StaticConfiguration` or `AppIntentConfiguration`
-- [ ] Small + medium widget families
-- [ ] Full-bleed partner photo + glass metadata overlay (iOS 26)
-- [ ] Placeholder / empty state: "Waiting for your stranger…"
+- [x] `POVStrangerWidget.swift` — `StaticConfiguration`
+- [x] Small + medium widget families
+- [x] Full-bleed partner photo + metadata overlay
+- [x] Placeholder / empty state: "Find a stranger to begin."
 
 ### 3.4 Deep link
 - [ ] `povstranger://session` URL scheme → opens app to active session

@@ -82,9 +82,11 @@ POV-Stranger/
 ├── POV-Stranger/
 │   ├── App/                 # Entry point
 │   ├── Models/              # SwiftData models
-│   ├── Services/            # Session, location, mock pairing
+│   ├── Services/            # Session, notifications, widget store
 │   ├── Views/               # Screens + components
 │   └── Assets.xcassets/
+├── POVStrangerWidget/       # Home Screen widget extension
+├── Shared/                  # App Group types shared with widget
 ├── docs/
 │   └── PLAN.md              # Detailed implementation plan + checklist
 └── README.md                # This file
@@ -101,7 +103,8 @@ See [docs/PLAN.md](docs/PLAN.md) for the full checklist. Summary:
 - [x] Mock session / pairing
 - [x] Main UI flow
 - [x] Camera capture (basic)
-- [ ] Widget extension
+- [x] Hourly local notifications
+- [x] Widget extension (basic)
 - [ ] Backend relay
 - [ ] Push notifications
 - [ ] App Store safety (moderation, 17+)
