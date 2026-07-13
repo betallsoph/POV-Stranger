@@ -22,6 +22,8 @@ final class SessionManager {
 
         context.insert(session)
         try context.save()
+        WidgetDataStore.update(from: session)
+        Task { await HourlyReminderScheduler.schedule(for: session) }
         return session
     }
 
@@ -61,6 +63,7 @@ final class SessionManager {
         }
 
         try context.save()
+        WidgetDataStore.update(from: session)
     }
 
     func submitFarewell(_ text: String, for session: StrangerSession, context: ModelContext) throws {
@@ -74,6 +77,8 @@ final class SessionManager {
     func endSession(_ session: StrangerSession, context: ModelContext) throws {
         context.delete(session)
         try context.save()
+        WidgetDataStore.clear()
+        Task { await HourlyReminderScheduler.cancelAll() }
     }
 
     #if DEBUG

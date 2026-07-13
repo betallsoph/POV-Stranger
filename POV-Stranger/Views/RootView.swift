@@ -43,10 +43,13 @@ struct RootView: View {
     }
 
     private func findStranger() {
-        do {
-            _ = try sessionManager.findMatch(context: modelContext)
-        } catch {
-            matchError = error.localizedDescription
+        Task {
+            _ = await HourlyReminderScheduler.requestAuthorization()
+            do {
+                _ = try sessionManager.findMatch(context: modelContext)
+            } catch {
+                matchError = error.localizedDescription
+            }
         }
     }
 
