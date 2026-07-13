@@ -29,7 +29,7 @@ Anonymous 24-hour photo exchange with a random stranger on the other side of the
 | Persistence | SwiftData (active session only, ephemeral) |
 | Widget | WidgetKit + App Groups *(planned)* |
 | Auth | Sign in with Apple → MongoDB Atlas |
-| Local DB | **Realm** (Atlas Device SDK, local-only) |
+| Local DB | **SwiftData** (Apple stack) |
 | Backend | **MongoDB Atlas** + Atlas Functions — [`docs/BACKEND.md`](docs/BACKEND.md) |
 | Storage | GridFS (photos, 25h TTL) |
 | Push | APNs from Atlas Functions |

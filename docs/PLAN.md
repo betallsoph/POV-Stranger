@@ -226,7 +226,7 @@ enum SessionStatus: String, Codable {
 
 | Layer | Choice |
 |-------|--------|
-| Local DB (iOS) | **Realm Swift SDK** (Atlas Device SDK — local only) |
+| Local DB (iOS) | **SwiftData** (Apple stack) |
 | Cloud DB | **MongoDB Atlas** |
 | Photo blobs | **GridFS** (25h TTL) |
 | API / logic | **Atlas Functions** + Triggers |
@@ -235,13 +235,13 @@ enum SessionStatus: String, Codable {
 | Weather | WeatherKit on iOS client |
 | Rematch | **Same pair OK after new ISO week** — not within same week |
 
-> ⚠️ Atlas **Device Sync** is EOL (Sept 2025). See [`BACKEND.md` §EOL](BACKEND.md#️-critical-atlas-device-sync-eol).
+> ℹ️ No Realm / Device Sync — SwiftData local + Atlas HTTPS. See [`BACKEND.md`](BACKEND.md).
 
 ### 4.1 Setup
 - [ ] MongoDB Atlas M0 cluster
 - [ ] Collections + TTL indexes (see BACKEND.md §5)
 - [ ] GridFS for photos
-- [ ] Realm Swift SDK in Xcode
+- [ ] SwiftData models already in app ✅
 - [ ] `Secrets.xcconfig` (gitignored)
 
 ### 4.2 Auth
@@ -258,11 +258,11 @@ enum SessionStatus: String, Codable {
 ### 4.4 Photo relay
 - [ ] GridFS upload via Function
 - [ ] `upload/confirm` → APNs silent push
-- [ ] Realm local cache → widget
+- [ ] SwiftData cache + widget update
 
 ### 4.5 iOS integration
 - [ ] `SessionServiceProtocol` + `AtlasSessionService`
-- [ ] Migrate active session from SwiftData → Realm (or bridge)
+- [ ] `AtlasSessionService` → existing SwiftData models
 - [ ] Keep `MockSessionService` for previews
 
 ### 4.6 Purge
@@ -448,7 +448,8 @@ POV-Stranger/
 | 2026-07-13 | SwiftData for local session | Native, fits ephemeral on-device cache |
 | TBD | Supabase vs Firebase | **Superseded:** MongoDB Atlas — see `docs/BACKEND.md` |
 | TBD | Exact photo compression target | 800px / 80KB JPEG |
-| 2026-07-13 | Backend stack | MongoDB Atlas + Realm local + Atlas Functions |
+| 2026-07-13 | Backend stack | MongoDB Atlas + **SwiftData** local + Atlas Functions |
+| 2026-07-13 | Local DB | **SwiftData only** — no Realm |
 | 2026-07-13 | Storage | GridFS, TTL 25h |
 | 2026-07-13 | Rematch rule | **Same week blocked; new ISO week allowed** ("có duyên thì gặp lại") |
 | 2026-07-13 | Timezone | **UTC** server + rematch week; partner TZ for display; device local for notifications |

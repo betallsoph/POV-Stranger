@@ -2,27 +2,25 @@
 
 > **Status:** Planning (pre-Phase 4)  
 > **Last updated:** 2026-07-13  
-> **Stack:** MongoDB Atlas + Realm (local) + Atlas Functions  
+> **Stack:** SwiftData (local) + MongoDB Atlas + Atlas Functions  
 > **Audience:** Anyone implementing backend relay, iOS sync, or infra.
 
 Read this before Phase 4 in [`PLAN.md`](PLAN.md).
 
 ---
 
-## ⚠️ Critical: Atlas Device Sync EOL
+## ℹ️ Note: Atlas Device Sync EOL (not used)
 
 **MongoDB Atlas Device Sync (formerly Realm Sync) reached end-of-life on September 30, 2025.**
 
-| Product | Status (2026) |
-|---------|----------------|
-| Atlas Device Sync | ❌ Shutdown |
-| Atlas App Services (full) | ❌ EOL — Triggers partially remain in Atlas UI |
-| Realm Swift SDK (local) | ✅ Open source, local-only DB still works |
-| MongoDB Atlas (cloud) | ✅ Fully supported |
+We **do not use** Realm or Device Sync. Local persistence stays **SwiftData** (Apple stack). MongoDB Atlas is **cloud-only** via HTTPS Functions.
 
-**What this means for POV-Stranger:** We use the **MongoDB Atlas Device SDK (Realm Swift SDK) as a local database** on iOS, and talk to **MongoDB Atlas** via **HTTPS Atlas Functions** (or MongoDB Data API). We do **not** rely on automatic Device Sync.
-
-This is still a valid "MongoDB mobile" architecture — local Realm + Atlas backend — just without the deprecated sync pipe.
+| Product | Our usage |
+|---------|-----------|
+| SwiftData | ✅ Local session, hour slots, offline cache |
+| MongoDB Atlas | ✅ Cloud DB + GridFS |
+| Atlas Functions | ✅ Match, upload, push, purge |
+| Realm / Device Sync | ❌ Not used |
 
 ---
 
@@ -33,7 +31,7 @@ This is still a valid "MongoDB mobile" architecture — local Realm + Atlas back
 3. [Recommended stack](#3-recommended-stack)
 4. [System architecture](#4-system-architecture)
 5. [Data model (MongoDB)](#5-data-model-mongodb)
-6. [Local model (Realm on iOS)](#6-local-model-realm-on-ios)
+6. [Local model (SwiftData on iOS)](#6-local-model-swiftdata-on-ios)
 7. [Storage design & TTL](#7-storage-design--ttl)
 8. [Matching & weekly rematch rule](#8-matching--weekly-rematch-rule)
 9. [Photo relay flow](#9-photo-relay-flow)
@@ -69,7 +67,7 @@ This is still a valid "MongoDB mobile" architecture — local Realm + Atlas back
 | Photo size | ≤ 80 KB JPEG, 800px max (client) |
 | Storage retention | **25 hours max** |
 | Cost at 1k DAU | < $30/month |
-| Offline | Local Realm holds active session; sync when online |
+| Offline | SwiftData holds active session; sync when online |
 
 ---
 
@@ -85,36 +83,26 @@ This is still a valid "MongoDB mobile" architecture — local Realm + Atlas back
 
 ## 3. Recommended stack
 
-### ✅ Decision: **MongoDB Atlas + Realm (local) + Atlas Functions**
+### ✅ Decision: **SwiftData (local) + MongoDB Atlas + Atlas Functions**
 
 | Layer | Technology | Role |
 |-------|------------|------|
-| **Local DB (iOS)** | Realm Swift SDK (`realm-swift`) | Active session, hour slots, offline cache |
+| **Local DB (iOS)** | **SwiftData** (`@Model`) | Active session, hour slots, offline cache — Apple stack |
 | **Cloud DB** | MongoDB Atlas (M0 dev / M10 prod) | Sessions, queue, pair history, metadata |
-| **Photo blobs** | **GridFS** on Atlas (or S3 + URL in doc) | JPEG storage, TTL index |
-| **API / logic** | **Atlas Functions** (HTTPS endpoints) | Match, upload, confirm, farewell, purge |
-| **Scheduled jobs** | **Atlas Triggers** (scheduled) | Session expiry, purge, queue cleanup |
-| **Auth** | Sign in with Apple → Atlas App Services Auth *or* custom JWT via Function | Anonymous identity |
+| **Photo blobs** | **GridFS** on Atlas | JPEG storage, TTL index |
+| **API / logic** | **Atlas Functions** + Triggers | Match, upload, confirm, farewell, purge |
+| **Auth** | Sign in with Apple → Atlas Auth or custom JWT | Anonymous identity |
 | **Push** | APNs HTTP/2 from Atlas Function | Silent push for widget |
 | **Weather** | WeatherKit on iOS | Client sends summary with upload |
 
-### Why MongoDB Atlas for this app?
+### Why SwiftData + Atlas (not Realm)?
 
-| Fit | Reason |
-|-----|--------|
-| Document model | Session + embedded hour slots map naturally to BSON |
-| TTL indexes | Native `expireAfterSeconds` on `hour_uploads`, GridFS chunks |
-| Flexible schema | Farewell, reports, blocks — add fields without migrations |
-| Atlas Functions | Matching logic in JS/TS, close to data |
-| Realm local | Fast on-device reads for widget + UI (no SwiftData conflict — pick one local store) |
-
-### Local persistence choice on iOS
-
-| Option | Recommendation |
-|--------|----------------|
-| SwiftData (current) | Keep for now during mock phase |
-| Realm (target) | **Migrate active session to Realm** when wiring Atlas — single local store for synced session objects |
-| Both long-term | ❌ Avoid dual local DBs |
+| Reason | Detail |
+|--------|--------|
+| Apple-native | Same stack as SwiftUI, `@Query`, `#Preview` |
+| Already in app | `StrangerSession`, `HourSlot` models exist |
+| No migration cost | Phase 4 wires `AtlasSessionService` → existing SwiftData |
+| Cloud separate | Atlas is HTTP relay only — no local sync framework needed |
 
 ---
 
@@ -123,10 +111,10 @@ This is still a valid "MongoDB mobile" architecture — local Realm + Atlas back
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     iOS App                              │
-│  ┌─────────────┐  ┌──────────────┐  ┌────────────────┐ │
-│  │ Realm (local)│  │ HTTPS client │  │ Widget / APNs  │ │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐ │
+│  │ SwiftData    │  │ HTTPS client │  │ Widget / APNs  │ │
 │  │ active sess  │  │ Atlas Funcs  │  │ handler        │ │
-│  └──────┬──────┘  └──────┬───────┘  └────────────────┘ │
+│  └──────┬───────┘  └──────┬───────┘  └────────────────┘ │
 └─────────┼────────────────┼──────────────────────────────┘
           │                │
           │         HTTPS (JWT)
@@ -147,13 +135,13 @@ This is still a valid "MongoDB mobile" architecture — local Realm + Atlas back
        APNs (Apple)
 ```
 
-### Sync pattern (post-Device-Sync)
+### Sync pattern
 
-Device Sync is **not used**. Instead:
+No automatic cloud sync framework. Manual relay:
 
-1. **Write:** iOS → HTTPS Function → MongoDB + GridFS
-2. **Read:** iOS polls or receives silent push → HTTPS Function → signed read / JSON + blob
-3. **Cache:** Write response into local Realm → UI + Widget read from Realm
+1. **Write:** iOS → HTTPS Function → MongoDB + GridFS → update SwiftData
+2. **Read:** Silent push or poll → HTTPS Function → download → update SwiftData → widget
+3. **UI:** `@Query` / `@Bindable` on SwiftData models (unchanged)
 
 ---
 
@@ -279,34 +267,30 @@ device_tokens
 
 ---
 
-## 6. Local model (Realm on iOS)
+## 6. Local model (SwiftData on iOS)
 
-Mirror active session for fast UI (synced from server responses):
+**Keep existing models** — no Realm migration.
 
 ```swift
-class LocalSession: Object {
-    @Persisted(primaryKey: true) var id: String
-    @Persisted var startedAt: Date
-    @Persisted var expiresAt: Date
-    @Persisted var status: String
-    @Persisted var partnerCountryCode: String
-    @Persisted var partnerCountryName: String
-    @Persisted var partnerDistanceKm: Double
-    @Persisted var partnerWeatherSummary: String
-    @Persisted var partnerTimeZoneId: String
-    @Persisted var slots: List<LocalHourSlot>
-}
+@Model
+final class StrangerSession { /* see Models/StrangerSession.swift */ }
 
-class LocalHourSlot: Object {
-    @Persisted var hourIndex: Int
-    @Persisted var myPhotoData: Data?
-    @Persisted var theirPhotoData: Data?
-    @Persisted var myCapturedAt: Date?
-    @Persisted var theirCapturedAt: Date?
+@Model
+final class HourSlot { /* see Models/HourSlot.swift */ }
+```
+
+### `AtlasSessionService` integration
+
+```swift
+// After HTTPS response from Atlas:
+func applyRemoteUpdate(_ dto: SessionDTO, context: ModelContext) throws {
+    // Upsert StrangerSession + HourSlot from server payload
+    // WidgetDataStore.update(from: session)
+    try context.save()
 }
 ```
 
-**Migration path:** Replace SwiftData `StrangerSession` with Realm when Phase 4 starts, or bridge via `AtlasSessionService` writing to both temporarily.
+SwiftData = **cache of active session**. Atlas = **source of truth** while session lives. On purge / end → `context.delete(session)` locally + server TTL.
 
 ---
 
@@ -402,7 +386,7 @@ iOS: compress JPEG (80KB)
   → POST /upload/confirm
   → Function writes hour_uploads + APNs silent → partner
   → Partner: GET /partner/latest
-  → Download blob → Realm → WidgetDataStore → widget reload
+  → Download blob → SwiftData + WidgetDataStore → widget reload
 ```
 
 Server never stores precise GPS — only country/timezone from user profile.
@@ -452,8 +436,9 @@ Same as prior plan — report, block, client Vision check, CSAM before App Store
 ### Dependencies
 
 ```swift
-// Package.swift / SPM
-.package(url: "https://github.com/realm/realm-swift", from: "10.54.0")
+// No Realm. Existing Apple stack only:
+// SwiftUI, SwiftData, WeatherKit, UserNotifications, WidgetKit
+// + URLSession for Atlas Functions HTTPS calls
 ```
 
 ### Service protocol (unchanged pattern)
@@ -511,7 +496,7 @@ Secrets: `APNS_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID`, Apple Services ID
 - [ ] MongoDB Atlas project + cluster
 - [ ] Collections + indexes + TTL
 - [ ] GridFS bucket config
-- [ ] Realm Swift SDK added to Xcode
+- [ ] SwiftData models already in app ✅
 
 ### 4b — Auth
 - [ ] Sign in with Apple
@@ -526,7 +511,7 @@ Secrets: `APNS_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID`, Apple Services ID
 ### 4d — Photo relay
 - [ ] GridFS upload/download Functions
 - [ ] APNs silent push on confirm
-- [ ] Realm local cache + widget
+- [ ] SwiftData cache + widget update
 
 ### 4e — Lifecycle
 - [ ] Farewell send/fetch
@@ -540,7 +525,7 @@ Secrets: `APNS_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID`, Apple Services ID
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-07-13 | ~~Supabase~~ → **MongoDB Atlas** | User choice; document model + TTL fit |
-| 2026-07-13 | **Realm local** (no Device Sync) | Device Sync EOL Sept 2025; Realm local still viable |
+| 2026-07-13 | Local DB | **SwiftData only** — no Realm |
 | 2026-07-13 | Photos in **GridFS** | Native MongoDB blob storage + TTL |
 | 2026-07-13 | Rematch: **allowed after new ISO week** | "Có duyên thì gặp lại" — not same week |
 | 2026-07-13 | `pair_history` kept permanently | Weekly check only; metadata, no photos |
@@ -615,6 +600,6 @@ function canPair(userA, userB) {
 1. Create MongoDB Atlas cluster (M0)
 2. Define collections + TTL indexes
 3. Implement `canPair()` with ISO week check
-4. Add Realm + `AtlasSessionService` on iOS
+4. Add `AtlasSessionService` writing to existing SwiftData models
 
 See [`PLAN.md` → Phase 4](PLAN.md#phase-4--backend-relay).
