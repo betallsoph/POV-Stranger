@@ -14,6 +14,8 @@ final class StrangerSession {
     var partnerTimeZoneIdentifier: String
     var myFarewellText: String?
     var theirFarewellText: String?
+    /// MongoDB Atlas session id when using cloud relay.
+    var remoteSessionId: String?
 
     @Relationship(deleteRule: .cascade, inverse: \HourSlot.session)
     var slots: [HourSlot]
@@ -41,6 +43,49 @@ final class StrangerSession {
         self.partnerWeatherSummary = partnerWeatherSummary
         self.partnerTimeZoneIdentifier = partnerTimeZoneIdentifier
         self.slots = (0..<24).map { HourSlot(hourIndex: $0) }
+    }
+
+    /// Create or update a local session from an Atlas response payload.
+    static func upsert(from remote: RemoteSessionDTO, in context: ModelContext) throws -> StrangerSession {
+        let remoteId = remote.id
+        let descriptor = FetchDescriptor<StrangerSession>(
+            predicate: #Predicate { $0.remoteSessionId == remoteId }
+        )
+        let existing = try context.fetch(descriptor).first
+
+        let session: StrangerSession
+        if let existing {
+            session = existing
+        } else {
+            session = StrangerSession(
+                startedAt: remote.startedAt,
+                partnerDistanceKm: remote.partnerDistanceKm,
+                partnerCountryCode: remote.partnerCountryCode,
+                partnerCountryName: remote.partnerCountryName,
+                partnerWeatherSummary: remote.partnerWeatherSummary,
+                partnerTimeZoneIdentifier: remote.partnerTimeZoneIdentifier
+            )
+            session.remoteSessionId = remoteId
+            session.slots = (0..<24).map { HourSlot(hourIndex: $0) }
+            context.insert(session)
+        }
+
+        session.startedAt = remote.startedAt
+        session.expiresAt = remote.expiresAt
+        session.status = SessionStatus(rawValue: remote.status) ?? .active
+        session.partnerDistanceKm = remote.partnerDistanceKm
+        session.partnerCountryCode = remote.partnerCountryCode
+        session.partnerCountryName = remote.partnerCountryName
+        session.partnerWeatherSummary = remote.partnerWeatherSummary
+        session.partnerTimeZoneIdentifier = remote.partnerTimeZoneIdentifier
+        session.remoteSessionId = remoteId
+
+        try context.save()
+        return session
+    }
+
+    var usesCloudRelay: Bool {
+        remoteSessionId != nil
     }
 
     var elapsed: TimeInterval {
