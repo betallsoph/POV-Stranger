@@ -63,7 +63,10 @@ struct ActiveSessionView: View {
                 try? sessionManager.submitPhoto(imageData, for: session, context: modelContext)
             }
         }
-        .onAppear { refreshStatus() }
+        .onAppear {
+            refreshStatus()
+            WidgetDataStore.update(from: session)
+        }
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in
             refreshStatus()
         }
