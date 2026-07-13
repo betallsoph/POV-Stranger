@@ -45,6 +45,7 @@ This is still a valid "MongoDB mobile" architecture — local Realm + Atlas back
 15. [Cost model](#15-cost-model)
 16. [Implementation phases](#16-implementation-phases)
 17. [Decision log](#17-decision-log)
+18. [Timezone policy](#18-timezone-policy)
 
 ---
 
@@ -372,8 +373,8 @@ function enqueue(user):
 
 ### ISO week definition
 
-- Use **ISO 8601 week** (Monday start, week 1 contains first Thursday)
-- Computed in Atlas Function with consistent UTC, or user's timezone — **recommend UTC on server** for fairness
+- **ISO 8601 week** (Monday start, week 1 = week containing first Thursday)
+- Computed in **UTC only** on the server at `matchedAt` — see [§18 Timezone policy](#18-timezone-policy)
 
 ### Optional future UX (not MVP)
 
@@ -546,6 +547,66 @@ Secrets: `APNS_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID`, Apple Services ID
 | 2026-07-13 | Block > rematch | Safety override |
 | 2026-07-13 | Weather: client WeatherKit | No server cost |
 | 2026-07-13 | Push: APNs direct from Functions | Silent widget refresh |
+| 2026-07-13 | **Timezone policy** | Store UTC; rematch week in UTC; display partner local; notifications device-local |
+
+---
+
+## 18. Timezone policy
+
+> **Decision (2026-07-13):** One rule per concern — don't use one timezone for everything.
+
+### Summary table
+
+| Concern | Timezone | Why |
+|---------|----------|-----|
+| **Server timestamps** | **UTC** (`ISODate`) | Single source of truth, no DST bugs |
+| **Session 24h expiry** | **Absolute** (`startedAt + 24h` UTC) | Fair — both users same duration |
+| **Hour slot index** | **Session-relative** (hour 0–23 from match) | No timezone math |
+| **Weekly rematch** | **ISO week in UTC** | One canonical “tuần” for pair_history |
+| **Partner clock in UI** | **Partner's `timezoneId`** | "2:14 AM in Iceland" — already in app |
+| **Hourly notifications** | **Device local** | `UNCalendarNotificationTrigger` — user's clock |
+| **Match scoring** | **UTC offset from `timezoneId`** | Maximize hour difference between strangers |
+
+### Why UTC for rematch week (not user local)?
+
+| Option | Problem |
+|--------|---------|
+| User A's timezone | Unfair — Iceland user could "skip" week boundary earlier |
+| User B's timezone | Same, reversed |
+| Both must be new week | Too strict — pair blocked until both calendars flip |
+| **UTC (chosen)** | One server rule, predictable, can't game by changing device TZ |
+
+**Edge case:** Sunday 11pm UTC vs Monday 8am Vietnam — server says same UTC week. That's OK: "tuần" is an internal rule, users never see "ISO week 28".
+
+### Implementation
+
+```js
+// Atlas Function — at match time
+function isoWeekUTC(date) {
+  // Use a well-tested lib (e.g. date-fns getISOWeek) in the Function
+  return { isoWeek, isoWeekYear }  // derived from UTC instant
+}
+
+function canPair(userA, userB) {
+  const { isoWeek, isoWeekYear } = isoWeekUTC(new Date())
+  const hit = pair_history.findOne({ userA, userB, isoWeek, isoWeekYear })
+  return !hit
+}
+```
+
+### iOS client
+
+| Field | Source |
+|-------|--------|
+| `timezoneId` on upload / enqueue | `TimeZone.current.identifier` |
+| Partner local time display | `session.partnerTimeZoneIdentifier` (from server at match) |
+| Session countdown | Absolute `expiresAt` — `TimelineView` already UTC-safe |
+
+### What we do NOT do
+
+- ❌ Store "local midnight" for session end
+- ❌ Compute hour slots in partner's timezone
+- ❌ Let user pick timezone for rematch rules
 
 ---
 
