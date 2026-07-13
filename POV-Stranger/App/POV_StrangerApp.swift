@@ -1,8 +1,12 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 @main
 struct POV_StrangerApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @State private var authManager = AuthManager()
+    @State private var sessionManager = SessionManager()
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             StrangerSession.self,
@@ -20,7 +24,8 @@ struct POV_StrangerApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
-                .environment(SessionManager())
+                .environment(sessionManager)
+                .environment(authManager)
         }
         .modelContainer(sharedModelContainer)
     }

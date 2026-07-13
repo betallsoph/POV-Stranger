@@ -4,6 +4,7 @@ import SwiftData
 struct RootView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SessionManager.self) private var sessionManager
+    @Environment(AuthManager.self) private var authManager
     @Query private var sessions: [StrangerSession]
 
     @State private var matchError: String?
@@ -23,6 +24,13 @@ struct RootView: View {
                 } else {
                     WaitingForMatchView(
                         isMatching: sessionManager.isMatching,
+                        requiresSignIn: authManager.requiresSignIn,
+                        isSigningIn: authManager.isSigningIn,
+                        authStatusLabel: authManager.statusLabel,
+                        authError: authManager.lastError,
+                        isSignedInForCloud: AtlasAuthTokenStore.isSignedIn,
+                        onSignIn: { Task { await authManager.signInWithApple() } },
+                        onSignOut: { authManager.signOut() },
                         onFindStranger: findStranger
                     )
                 }
@@ -36,6 +44,9 @@ struct RootView: View {
         } message: {
             Text(matchError ?? "")
         }
+        .task {
+            await authManager.restoreSessionIfNeeded()
+        }
     }
 
     private var activeSession: StrangerSession? {
@@ -43,6 +54,11 @@ struct RootView: View {
     }
 
     private func findStranger() {
+        guard authManager.isAuthenticated else {
+            matchError = "Sign in with Apple before finding a stranger."
+            return
+        }
+
         Task {
             _ = await HourlyReminderScheduler.requestAuthorization()
             do {
@@ -63,5 +79,6 @@ struct RootView: View {
 #Preview {
     RootView()
         .environment(SessionManager())
+        .environment(AuthManager())
         .modelContainer(for: [StrangerSession.self, HourSlot.self], inMemory: true)
 }

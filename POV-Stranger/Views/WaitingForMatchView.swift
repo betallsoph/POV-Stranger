@@ -2,7 +2,18 @@ import SwiftUI
 
 struct WaitingForMatchView: View {
     let isMatching: Bool
+    let requiresSignIn: Bool
+    let isSigningIn: Bool
+    let authStatusLabel: String
+    let authError: String?
+    let isSignedInForCloud: Bool
+    let onSignIn: () -> Void
+    let onSignOut: () -> Void
     let onFindStranger: () -> Void
+
+    private var canFindStranger: Bool {
+        !isMatching && (!requiresSignIn || isSignedInForCloud)
+    }
 
     var body: some View {
         VStack(spacing: 32) {
@@ -34,6 +45,17 @@ struct WaitingForMatchView: View {
             .padding()
             .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
 
+            if requiresSignIn || AtlasConfig.requiresAuth {
+                SignInWithAppleCard(
+                    isSigningIn: isSigningIn,
+                    statusLabel: authStatusLabel,
+                    errorMessage: authError,
+                    onSignIn: onSignIn,
+                    onSignOut: onSignOut,
+                    showSignOut: isSignedInForCloud
+                )
+            }
+
             Spacer()
 
             Button(action: onFindStranger) {
@@ -50,12 +72,22 @@ struct WaitingForMatchView: View {
                 .padding()
             }
             .buttonStyle(.borderedProminent)
-            .disabled(isMatching)
+            .disabled(!canFindStranger)
         }
         .padding()
     }
 }
 
 #Preview {
-    WaitingForMatchView(isMatching: false, onFindStranger: {})
+    WaitingForMatchView(
+        isMatching: false,
+        requiresSignIn: false,
+        isSigningIn: false,
+        authStatusLabel: "Offline demo mode",
+        authError: nil,
+        isSignedInForCloud: false,
+        onSignIn: {},
+        onSignOut: {},
+        onFindStranger: {}
+    )
 }
