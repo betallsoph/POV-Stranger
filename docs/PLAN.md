@@ -128,34 +128,34 @@ enum SessionStatus: String, Codable {
 - [x] `docs/PLAN.md` — this file
 
 ### 1.2 Domain models
-- [ ] `Models/SessionStatus.swift`
-- [ ] `Models/HourSlot.swift` — SwiftData `@Model`
-- [ ] `Models/StrangerSession.swift` — SwiftData `@Model`
-- [ ] Remove template `Item.swift`
-- [ ] Update `POV_StrangerApp.swift` schema
+- [x] `Models/SessionStatus.swift`
+- [x] `Models/HourSlot.swift` — SwiftData `@Model`
+- [x] `Models/StrangerSession.swift` — SwiftData `@Model`
+- [x] Remove template `Item.swift`
+- [x] Update `POV_StrangerApp.swift` schema
 
 ### 1.3 Services
-- [ ] `Services/MockPartner.swift` — preset strangers (Iceland, Brazil, Japan…)
-- [ ] `Services/SessionManager.swift` — `@Observable`, MainActor
-  - [ ] `findMatch()` — create session with random mock partner
-  - [ ] `currentHourIndex(for:)` 
-  - [ ] `updateSessionStatus(for:)` — active → farewell
-  - [ ] `endSession(_:)` — purge SwiftData
-  - [ ] `submitFarewell(_:text:)` 
+- [x] `Services/MockPartner.swift` — preset strangers (Iceland, Brazil, Japan…)
+- [x] `Services/SessionManager.swift` — `@Observable`, MainActor
+  - [x] `findMatch()` — create session with random mock partner
+  - [x] `currentHourIndex(for:)` 
+  - [x] `updateSessionStatus(for:)` — active → farewell
+  - [x] `endSession(_:)` — purge SwiftData
+  - [x] `submitFarewell(_:text:)` 
 
 ### 1.4 Views
-- [ ] `Views/RootView.swift` — routes by session state
-- [ ] `Views/WaitingForMatchView.swift` — idle + "Find a stranger" CTA
-- [ ] `Views/ActiveSessionView.swift` — partner metadata + timeline
-- [ ] `Views/Components/PartnerMetadataCard.swift` — distance, weather, time
-- [ ] `Views/Components/HourTimelineView.swift` — 24-slot grid
-- [ ] `Views/Components/SessionCountdownView.swift` — time remaining
-- [ ] `Views/SessionEndedView.swift` — show farewell + dismiss
-- [ ] Replace `ContentView.swift` usage with `RootView`
+- [x] `Views/RootView.swift` — routes by session state
+- [x] `Views/WaitingForMatchView.swift` — idle + "Find a stranger" CTA
+- [x] `Views/ActiveSessionView.swift` — partner metadata + timeline
+- [x] `Views/Components/PartnerMetadataCard.swift` — distance, weather, time
+- [x] `Views/Components/HourTimelineView.swift` — 24-slot grid
+- [x] `Views/Components/SessionCountdownView.swift` — time remaining
+- [x] `Views/SessionEndedView.swift` — show farewell + dismiss
+- [x] Replace `ContentView.swift` usage with `RootView`
 
 ### 1.5 Dev / debug
-- [ ] `#Preview` blocks with in-memory ModelContainer
-- [ ] Debug: fast-forward hour button (DEBUG only)
+- [x] `#Preview` blocks with in-memory ModelContainer
+- [x] Debug: fast-forward hour button (DEBUG only)
 
 **Phase 1 done when:** User can tap Find → see mock partner metadata → see 24-slot timeline → session countdown ticks → farewell at T-2h → session ends and data purges.
 
@@ -166,13 +166,14 @@ enum SessionStatus: String, Codable {
 > Goal: Real photo capture and slot submission.
 
 ### 2.1 Permissions
-- [ ] `NSCameraUsageDescription` in Info.plist (via build setting)
+- [x] `NSCameraUsageDescription` in Info.plist (via build setting)
+- [x] `NSPhotoLibraryUsageDescription` in Info.plist (via build setting)
 - [ ] `Services/CameraPermission.swift` — check/request access
 
 ### 2.2 Photo capture
-- [ ] `Views/CapturePhotoView.swift` — `UIImagePickerController` wrapper or `PhotosUI`
-- [ ] `Services/PhotoCompressor.swift` — resize to max 800px, JPEG ~80KB
-- [ ] `SessionManager.submitPhoto(_:image:for:)` — save to current hour slot
+- [x] `Views/CapturePhotoView.swift` — `UIImagePickerController` wrapper or `PhotosUI`
+- [x] `Services/PhotoCompressor.swift` — resize to max 800px, JPEG ~80KB
+- [x] `SessionManager.submitPhoto(_:image:for:)` — save to current hour slot
 
 ### 2.3 Hourly prompts (local only)
 - [ ] `Services/HourlyReminderScheduler.swift` — `UNUserNotificationCenter`

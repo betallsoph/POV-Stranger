@@ -97,10 +97,10 @@ See [docs/PLAN.md](docs/PLAN.md) for the full checklist. Summary:
 - [x] Project scaffold (SwiftUI + SwiftData template)
 - [x] Build succeeds on external drive
 - [x] Documentation (README + PLAN)
-- [ ] Domain models
-- [ ] Mock session / pairing
-- [ ] Main UI flow
-- [ ] Camera capture
+- [x] Domain models
+- [x] Mock session / pairing
+- [x] Main UI flow
+- [x] Camera capture (basic)
 - [ ] Widget extension
 - [ ] Backend relay
 - [ ] Push notifications
