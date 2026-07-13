@@ -76,6 +76,26 @@ final class SessionManager {
         try context.save()
     }
 
+    #if DEBUG
+    func debugEnterFarewellWindow(_ session: StrangerSession, context: ModelContext) throws {
+        session.expiresAt = Date.now.addingTimeInterval(90 * 60)
+        session.status = .farewell
+        try context.save()
+    }
+
+    func debugExpireSession(_ session: StrangerSession, context: ModelContext) throws {
+        session.expiresAt = Date.now.addingTimeInterval(-1)
+        session.status = .ended
+        try context.save()
+    }
+
+    func debugAdvanceHour(_ session: StrangerSession, context: ModelContext) throws {
+        let hoursElapsed = session.currentHourIndex + 1
+        session.startedAt = Date.now.addingTimeInterval(-Double(hoursElapsed) * 3600)
+        try refreshSessionStatus(session, context: context)
+    }
+    #endif
+
     func activeSession(from sessions: [StrangerSession]) -> StrangerSession? {
         sessions
             .filter { $0.status != .ended }

@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import Combine
+import UIKit
 
 struct ActiveSessionView: View {
     @Environment(\.modelContext) private var modelContext
@@ -97,6 +98,21 @@ struct ActiveSessionView: View {
                 try? sessionManager.submitPhoto(data, for: session, context: modelContext)
             }
             .buttonStyle(.bordered)
+
+            Button("Advance 1 hour") {
+                try? sessionManager.debugAdvanceHour(session, context: modelContext)
+            }
+            .buttonStyle(.bordered)
+
+            Button("Enter farewell window") {
+                try? sessionManager.debugEnterFarewellWindow(session, context: modelContext)
+            }
+            .buttonStyle(.bordered)
+
+            Button("End session now") {
+                try? sessionManager.debugExpireSession(session, context: modelContext)
+            }
+            .buttonStyle(.bordered)
         }
     }
     #endif
@@ -113,15 +129,21 @@ private struct PartnerPhotoCard: View {
                 .foregroundStyle(.secondary)
 
             ZStack(alignment: .bottomLeading) {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(
+                Group {
+                    if let data = slot.theirPhotoData, let uiImage = UIImage(data: data) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
                         LinearGradient(
                             colors: [.blue.opacity(0.6), .purple.opacity(0.4)],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
-                    )
-                    .frame(height: 220)
+                    }
+                }
+                .frame(height: 220)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(session.formattedDistance)
