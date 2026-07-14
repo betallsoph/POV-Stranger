@@ -9,16 +9,22 @@ struct RootView: View {
 
     @State private var matchError: String?
     @State private var ageGateConfirmed = AgeGateStore.isConfirmed
+    @State private var onboardingComplete = OnboardingStore.isComplete
 
     var body: some View {
         Group {
-            if ageGateConfirmed {
-                mainContent
-            } else {
+            if !ageGateConfirmed {
                 AgeGateView {
                     AgeGateStore.confirm()
                     ageGateConfirmed = true
                 }
+            } else if !onboardingComplete {
+                OnboardingView {
+                    OnboardingStore.markComplete()
+                    onboardingComplete = true
+                }
+            } else {
+                mainContent
             }
         }
     }

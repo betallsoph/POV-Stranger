@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SessionCountdownView: View {
     let session: StrangerSession
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { _ in
@@ -16,14 +17,23 @@ struct SessionCountdownView: View {
                 } else {
                     Text(formatRemaining(session.remaining))
                         .font(.title2.monospacedDigit().bold())
-                        .contentTransition(.numericText())
+                        .modifier(CountdownTransition(disabled: reduceMotion))
                 }
 
                 Text("Hour \(session.currentHourIndex + 1) of 24")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibilityLabel)
         }
+    }
+
+    private var accessibilityLabel: String {
+        if session.isExpired {
+            return "Session ended"
+        }
+        return "Time remaining \(formatRemaining(session.remaining)), hour \(session.currentHourIndex + 1) of 24"
     }
 
     private func formatRemaining(_ interval: TimeInterval) -> String {
@@ -32,6 +42,18 @@ struct SessionCountdownView: View {
         let minutes = (total % 3600) / 60
         let seconds = total % 60
         return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+}
+
+private struct CountdownTransition: ViewModifier {
+    let disabled: Bool
+
+    func body(content: Content) -> some View {
+        if disabled {
+            content
+        } else {
+            content.contentTransition(.numericText())
+        }
     }
 }
 

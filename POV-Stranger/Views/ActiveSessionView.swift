@@ -67,6 +67,7 @@ struct ActiveSessionView: View {
                     Label("Capture", systemImage: "camera.fill")
                 }
                 .disabled(session.isExpired)
+                .accessibilityLabel(String(localized: "a11y.capture", table: "Localizable"))
             }
         }
         .sheet(isPresented: $showingCapture) {
@@ -195,6 +196,7 @@ private struct PartnerPhotoCard: View {
                 }
                 .buttonStyle(.borderless)
                 .foregroundStyle(.red)
+                .accessibilityLabel(String(localized: "a11y.report", table: "Localizable"))
             }
 
             ZStack(alignment: .bottomLeading) {
@@ -221,7 +223,7 @@ private struct PartnerPhotoCard: View {
                         .font(.caption2)
                 }
                 .padding(12)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
                 .padding(12)
             }
         }

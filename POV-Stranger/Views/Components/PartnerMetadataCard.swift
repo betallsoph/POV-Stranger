@@ -21,8 +21,8 @@ struct PartnerMetadataCard: View {
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .povGlassCard()
+        .accessibilityElement(children: .combine)
     }
 }
 

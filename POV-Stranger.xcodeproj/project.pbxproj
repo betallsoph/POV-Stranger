@@ -168,6 +168,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				vi,
 				Base,
 			);
 			mainGroup = 64B808EC30051D890065C3D3;

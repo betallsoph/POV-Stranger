@@ -40,7 +40,7 @@ struct FarewellComposeView: View {
             }
         }
         .padding()
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .povGlassCard()
     }
 }
 

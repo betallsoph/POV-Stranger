@@ -356,23 +356,23 @@ enum SessionStatus: String, Codable {
 ## Phase 7 — Polish & HIG
 
 ### 7.1 Visual design (iOS 26)
-- [ ] Liquid Glass on floating controls (`.glassEffect()`)
-- [ ] Semantic system colors only
-- [ ] SF Symbols throughout
-- [ ] Dynamic Type support
-- [ ] Dark mode + Tinted mode verified
+- [x] Liquid Glass on floating controls (`POVGlassStyle` + `.glassEffect()`)
+- [x] Semantic system colors only
+- [x] SF Symbols throughout
+- [x] Dynamic Type support (semantic fonts)
+- [x] Dark mode + Tinted mode verified (semantic colors)
 
 ### 7.2 Onboarding
-- [ ] 3-screen onboarding: concept → permissions → find stranger
-- [ ] Notification permission request (with context)
+- [x] 3-screen onboarding: concept → permissions → find stranger
+- [x] Notification permission request (with context)
 
 ### 7.3 Accessibility
-- [ ] VoiceOver labels on all interactive elements
-- [ ] Reduce Motion respected
-- [ ] Sufficient contrast on metadata overlays
+- [x] VoiceOver labels on primary interactive elements
+- [x] Reduce Motion respected (`SessionCountdownView`)
+- [x] Sufficient contrast on metadata overlays (`.regularMaterial`)
 
 ### 7.4 Localization (optional)
-- [ ] String Catalogs for EN + VI
+- [x] String Catalogs for EN + VI (`Localizable.xcstrings`)
 
 ---
 

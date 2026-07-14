@@ -42,8 +42,7 @@ struct WaitingForMatchView: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .povGlassCard()
 
             if requiresSignIn || AtlasConfig.requiresAuth {
                 SignInWithAppleCard(
@@ -62,17 +61,16 @@ struct WaitingForMatchView: View {
                 Group {
                     if isMatching {
                         ProgressView()
-                            .tint(.white)
                     } else {
-                        Text("Find a stranger")
-                            .font(.headline)
+                        Text("Find a stranger", tableName: "Localizable")
+                            .povGlassProminentButton()
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .padding()
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.plain)
             .disabled(!canFindStranger)
+            .accessibilityLabel(String(localized: "a11y.findStranger", table: "Localizable"))
+            .accessibilityHint(String(localized: "a11y.findStranger.hint", table: "Localizable"))
         }
         .padding()
     }

@@ -44,8 +44,7 @@ struct SignInWithAppleCard: View {
                     .foregroundStyle(.red)
             }
         }
-        .padding()
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .povGlassCard()
     }
 }
 
