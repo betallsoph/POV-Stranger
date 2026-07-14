@@ -1,4 +1,6 @@
 // Atlas Function: getActiveSession
+const { getFarewellTexts } = require("../_lib/farewell");
+
 const DB_NAME = "povstranger";
 
 exports = async function (arg, context) {
@@ -16,13 +18,14 @@ exports = async function (arg, context) {
 
   if (!session) return { session: null };
 
-  return { session: serializeSession(session, userId) };
+  return { session: await serializeSession(db, session, userId) };
 };
 
-function serializeSession(session, viewerId) {
+async function serializeSession(db, session, viewerId) {
   const isUserA = session.userA.toString() === viewerId.toString();
   const partnerCountry = isUserA ? session.userBCountry : session.userACountry;
   const partnerTimezone = isUserA ? session.userBTimezone : session.userATimezone;
+  const { myFarewellText, theirFarewellText } = await getFarewellTexts(db, session, viewerId);
 
   return {
     id: session._id.toString(),
@@ -34,5 +37,7 @@ function serializeSession(session, viewerId) {
     partnerTimeZoneIdentifier: partnerTimezone,
     partnerWeatherSummary: "—",
     partnerDistanceKm: 10000,
+    myFarewellText,
+    theirFarewellText,
   };
 }

@@ -4,6 +4,7 @@
 // Body: { sessionId, hourIndex, weatherSummary, imageBase64 }
 
 const { GridFSBucket } = require("mongodb");
+const { notifyPartnerPhoto } = require("../_lib/apns");
 const { getSessionForUser, partnerUserId, currentHourIndex } = require("../_lib/session");
 
 const DB_NAME = "povstranger";
@@ -80,9 +81,8 @@ exports = async function (arg, context) {
     createdAt: now,
   });
 
-  // Phase 4d: APNs silent push to partner — type "partner.photo"
-  // const partnerId = partnerUserId(session, userId);
-  // await notifyPartner(db, partnerId, { sessionId, hourIndex });
+  const partnerId = partnerUserId(session, userId);
+  await notifyPartnerPhoto(db, context, partnerId, sessionOid.toString(), hourIndex);
 
   return {
     ok: true,
