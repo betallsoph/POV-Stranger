@@ -80,8 +80,33 @@ final class StrangerSession {
         session.partnerTimeZoneIdentifier = remote.partnerTimeZoneIdentifier
         session.remoteSessionId = remoteId
 
+        if let myFarewellText = remote.myFarewellText {
+            session.myFarewellText = myFarewellText
+        }
+        if let theirFarewellText = remote.theirFarewellText {
+            session.theirFarewellText = theirFarewellText
+        }
+
         try context.save()
         return session
+    }
+
+    func applyRemoteSync(_ remote: RemoteSessionDTO) {
+        startedAt = remote.startedAt
+        expiresAt = remote.expiresAt
+        status = SessionStatus(rawValue: remote.status) ?? status
+        partnerDistanceKm = remote.partnerDistanceKm
+        partnerCountryCode = remote.partnerCountryCode
+        partnerCountryName = remote.partnerCountryName
+        partnerWeatherSummary = remote.partnerWeatherSummary
+        partnerTimeZoneIdentifier = remote.partnerTimeZoneIdentifier
+
+        if let myFarewellText = remote.myFarewellText {
+            self.myFarewellText = myFarewellText
+        }
+        if let theirFarewellText = remote.theirFarewellText {
+            self.theirFarewellText = theirFarewellText
+        }
     }
 
     var usesCloudRelay: Bool {

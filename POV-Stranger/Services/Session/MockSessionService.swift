@@ -17,7 +17,9 @@ struct MockSessionService: SessionServiceProtocol {
             partnerCountryName: partner.countryName,
             partnerTimeZoneIdentifier: partner.timeZoneIdentifier,
             partnerWeatherSummary: partner.weatherSummary,
-            partnerDistanceKm: partner.distanceKm
+            partnerDistanceKm: partner.distanceKm,
+            myFarewellText: nil,
+            theirFarewellText: nil
         )
         return .matched(dto)
     }
@@ -58,6 +60,17 @@ struct MockSessionService: SessionServiceProtocol {
         guard !trimmed.isEmpty, session.myFarewellText == nil else { return }
         session.myFarewellText = trimmed
         session.theirFarewellText = "Thank you for sharing your world today."
+        try context.save()
+    }
+
+    func syncSession(for session: StrangerSession, context: ModelContext) async throws {
+        if session.isExpired {
+            session.status = .ended
+        } else if session.isInFarewellWindow {
+            session.status = .farewell
+        } else {
+            session.status = .active
+        }
         try context.save()
     }
 }

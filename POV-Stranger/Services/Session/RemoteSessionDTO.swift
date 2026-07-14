@@ -10,6 +10,24 @@ struct RemoteSessionDTO: Codable, Sendable {
     let partnerTimeZoneIdentifier: String
     let partnerWeatherSummary: String
     let partnerDistanceKm: Double
+    let myFarewellText: String?
+    let theirFarewellText: String?
+}
+
+struct GetActiveSessionResponse: Codable, Sendable {
+    let session: RemoteSessionDTO?
+    let error: String?
+}
+
+struct SubmitFarewellRequest: Encodable, Sendable {
+    let sessionId: String
+    let text: String
+}
+
+struct SubmitFarewellResponse: Decodable, Sendable {
+    let ok: Bool?
+    let text: String?
+    let error: String?
 }
 
 struct MatchEnqueueResponse: Codable, Sendable {

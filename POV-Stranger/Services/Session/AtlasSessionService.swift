@@ -101,6 +101,56 @@ struct AtlasSessionService: SessionServiceProtocol {
         for session: StrangerSession,
         context: ModelContext
     ) async throws {
-        throw SessionServiceError.server("Farewell sync not implemented yet.")
+        guard let remoteId = session.remoteSessionId else {
+            throw SessionServiceError.server("Session has no remote id.")
+        }
+
+        let trimmed = String(text.prefix(280))
+        guard !trimmed.isEmpty, session.myFarewellText == nil else { return }
+
+        let body = SubmitFarewellRequest(sessionId: remoteId, text: trimmed)
+        let response: SubmitFarewellResponse = try await client.post(
+            function: "submitFarewell",
+            body: body
+        )
+
+        if let error = response.error {
+            if error == "Unauthorized" { throw SessionServiceError.unauthorized }
+            throw SessionServiceError.server(error)
+        }
+        guard response.ok == true else {
+            throw SessionServiceError.server("Farewell submit failed.")
+        }
+
+        session.myFarewellText = response.text ?? trimmed
+        if session.isInFarewellWindow {
+            session.status = .farewell
+        }
+        try context.save()
+    }
+
+    func syncSession(for session: StrangerSession, context: ModelContext) async throws {
+        struct EmptyBody: Encodable {}
+
+        let response: GetActiveSessionResponse = try await client.post(
+            function: "getActiveSession",
+            body: EmptyBody()
+        )
+
+        if let error = response.error {
+            if error == "Unauthorized" { throw SessionServiceError.unauthorized }
+            throw SessionServiceError.server(error)
+        }
+
+        guard let remote = response.session else {
+            if session.status != .ended {
+                session.status = .ended
+                try context.save()
+            }
+            return
+        }
+
+        session.applyRemoteSync(remote)
+        try context.save()
     }
 }

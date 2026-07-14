@@ -26,4 +26,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         print("APNs registration failed: \(error.localizedDescription)")
         #endif
     }
+
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        Task { @MainActor in
+            let result = await RemoteNotificationHandler.shared.handleRemoteNotification(userInfo)
+            completionHandler(result)
+        }
+    }
 }

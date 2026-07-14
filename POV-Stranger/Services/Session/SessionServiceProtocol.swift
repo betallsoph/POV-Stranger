@@ -17,4 +17,5 @@ protocol SessionServiceProtocol {
         for session: StrangerSession,
         context: ModelContext
     ) async throws
+    func syncSession(for session: StrangerSession, context: ModelContext) async throws
 }

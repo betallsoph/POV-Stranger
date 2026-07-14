@@ -26,6 +26,9 @@ struct POV_StrangerApp: App {
             RootView()
                 .environment(sessionManager)
                 .environment(authManager)
+                .onAppear {
+                    RemoteNotificationHandler.shared.configure(modelContainer: sharedModelContainer)
+                }
         }
         .modelContainer(sharedModelContainer)
     }

@@ -35,7 +35,10 @@ struct ActiveSessionView: View {
                 )
 
                 if session.status == .farewell {
-                    FarewellComposeView(text: $farewellText) {
+                    FarewellComposeView(
+                        text: $farewellText,
+                        hasSent: session.myFarewellText != nil
+                    ) {
                         Task { await sendFarewell() }
                     }
                 }
@@ -71,11 +74,10 @@ struct ActiveSessionView: View {
             }
         }
         .onAppear {
-            refreshStatus()
-            WidgetDataStore.update(from: session)
+            Task { await refreshStatus() }
         }
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in
-            refreshStatus()
+            Task { await refreshStatus() }
         }
     }
 
@@ -86,8 +88,8 @@ struct ActiveSessionView: View {
             .first
     }
 
-    private func refreshStatus() {
-        try? sessionManager.refreshSessionStatus(session, context: modelContext)
+    private func refreshStatus() async {
+        try? await sessionManager.refreshSessionStatus(session, context: modelContext)
     }
 
     private func sendFarewell() async {
@@ -111,7 +113,9 @@ struct ActiveSessionView: View {
             .buttonStyle(.bordered)
 
             Button("Advance 1 hour") {
-                try? sessionManager.debugAdvanceHour(session, context: modelContext)
+                Task {
+                    try? await sessionManager.debugAdvanceHour(session, context: modelContext)
+                }
             }
             .buttonStyle(.bordered)
 

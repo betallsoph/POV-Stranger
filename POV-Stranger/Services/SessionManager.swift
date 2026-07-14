@@ -29,15 +29,26 @@ final class SessionManager {
         }
     }
 
-    func refreshSessionStatus(_ session: StrangerSession, context: ModelContext) throws {
-        if session.isExpired {
-            session.status = .ended
-        } else if session.isInFarewellWindow {
-            session.status = .farewell
+    func refreshSessionStatus(_ session: StrangerSession, context: ModelContext) async throws {
+        if sessionService.isCloudBacked {
+            try await sessionService.syncSession(for: session, context: context)
         } else {
-            session.status = .active
+            if session.isExpired {
+                session.status = .ended
+            } else if session.isInFarewellWindow {
+                session.status = .farewell
+            } else {
+                session.status = .active
+            }
+            try context.save()
         }
-        try context.save()
+
+        if session.status == .ended {
+            WidgetDataStore.clear()
+            await HourlyReminderScheduler.cancelAll()
+        } else {
+            WidgetDataStore.update(from: session)
+        }
     }
 
     func submitPhoto(
@@ -79,10 +90,10 @@ final class SessionManager {
         try context.save()
     }
 
-    func debugAdvanceHour(_ session: StrangerSession, context: ModelContext) throws {
+    func debugAdvanceHour(_ session: StrangerSession, context: ModelContext) async throws {
         let hoursElapsed = session.currentHourIndex + 1
         session.startedAt = Date.now.addingTimeInterval(-Double(hoursElapsed) * 3600)
-        try refreshSessionStatus(session, context: context)
+        try await refreshSessionStatus(session, context: context)
     }
 
     func debugSimulatePartnerPhoto(_ session: StrangerSession, context: ModelContext) async throws {
@@ -93,7 +104,6 @@ final class SessionManager {
 
     func activeSession(from sessions: [StrangerSession]) -> StrangerSession? {
         sessions
-            .filter { $0.status != .ended }
             .sorted { $0.startedAt > $1.startedAt }
             .first
     }
