@@ -35,7 +35,8 @@ Copy each file from `backend/atlas/functions/` into Atlas App Services → Funct
 | `getActiveSession` | `getActiveSession.js` | Fetch current session for user |
 | `uploadPhoto` | `uploadPhoto.js` | Upload JPEG to GridFS + `hour_uploads` |
 | `getPartnerPhoto` | `getPartnerPhoto.js` | Download partner photo for hour |
-| `submitFarewell` | `submitFarewell.js` | Send farewell message (T-2h) |
+| `submitFarewell` | `submitFarewell.js` | Farewell message (T-2h) |
+| `reportAndBlock` | `reportAndBlock.js` | Report + block partner, end session |
 | `sessionLifecycle` | `sessionLifecycle.js` | **Scheduled** — farewell/end/purge |
 
 **Dependencies:** Add `_lib/` helpers: `canPair.js`, `isoWeek.js`, `session.js`, `apns.js`, `farewell.js`, `purge.js`.
@@ -54,6 +55,7 @@ For each function, create an HTTPS Endpoint (authenticated) in App Services:
 | `uploadPhoto` | `uploadPhoto` | POST |
 | `getPartnerPhoto` | `getPartnerPhoto` | POST |
 | `submitFarewell` | `submitFarewell` | POST |
+| `reportAndBlock` | `reportAndBlock` | POST |
 
 **Scheduled Trigger:** `sessionLifecycle` every **15 minutes** (no HTTPS endpoint).
 
