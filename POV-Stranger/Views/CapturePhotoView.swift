@@ -8,6 +8,7 @@ struct CapturePhotoView: View {
     @State private var showingCamera = false
     @State private var showingLibrary = false
     @State private var selectedImage: UIImage?
+    @State private var safetyError: String?
 
     var body: some View {
         NavigationStack {
@@ -72,6 +73,14 @@ struct CapturePhotoView: View {
                 }
                 .ignoresSafeArea()
             }
+            .alert("Can't share this photo", isPresented: .init(
+                get: { safetyError != nil },
+                set: { if !$0 { safetyError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(safetyError ?? "")
+            }
         }
     }
 
@@ -83,8 +92,16 @@ struct CapturePhotoView: View {
     private func sendPhoto() {
         guard let selectedImage,
               let data = PhotoCompressor.compress(selectedImage) else { return }
-        onCapture(data)
-        dismiss()
+
+        Task {
+            do {
+                try await ContentSafetyChecker.validate(selectedImage)
+                onCapture(data)
+                dismiss()
+            } catch {
+                safetyError = error.localizedDescription
+            }
+        }
     }
 }
 

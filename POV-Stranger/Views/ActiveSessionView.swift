@@ -10,6 +10,10 @@ struct ActiveSessionView: View {
     @Bindable var session: StrangerSession
     @State private var showingCapture = false
     @State private var farewellText = ""
+    @State private var showingReportConfirm = false
+    @State private var reportError: String?
+
+    private let safetyService = SafetyService()
 
     var body: some View {
         ScrollView {
@@ -17,7 +21,11 @@ struct ActiveSessionView: View {
                 SessionCountdownView(session: session)
 
                 if let latestSlot = latestPartnerSlot, latestSlot.theirPhotoData != nil {
-                    PartnerPhotoCard(slot: latestSlot, session: session)
+                    PartnerPhotoCard(
+                        slot: latestSlot,
+                        session: session,
+                        onReport: { showingReportConfirm = true }
+                    )
                 } else {
                     ContentUnavailableView(
                         "Waiting for their world",
@@ -79,6 +87,26 @@ struct ActiveSessionView: View {
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in
             Task { await refreshStatus() }
         }
+        .confirmationDialog(
+            "Report this photo?",
+            isPresented: $showingReportConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Report & block", role: .destructive) {
+                Task { await reportPartner() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("They'll be blocked and this session will end immediately.")
+        }
+        .alert("Couldn't submit report", isPresented: .init(
+            get: { reportError != nil },
+            set: { if !$0 { reportError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(reportError ?? "")
+        }
     }
 
     private var latestPartnerSlot: HourSlot? {
@@ -95,6 +123,20 @@ struct ActiveSessionView: View {
     private func sendFarewell() async {
         try? await sessionManager.submitFarewell(farewellText, for: session, context: modelContext)
         farewellText = ""
+    }
+
+    private func reportPartner() async {
+        do {
+            try await safetyService.reportAndBlock(
+                session: session,
+                reason: "inappropriate_content",
+                context: modelContext
+            )
+            WidgetDataStore.clear()
+            await HourlyReminderScheduler.cancelAll()
+        } catch {
+            reportError = error.localizedDescription
+        }
     }
 
     #if DEBUG
@@ -136,12 +178,24 @@ struct ActiveSessionView: View {
 private struct PartnerPhotoCard: View {
     let slot: HourSlot
     let session: StrangerSession
+    let onReport: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Through their eyes · Hour \(slot.hourIndex + 1)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            HStack {
+                Text("Through their eyes · Hour \(slot.hourIndex + 1)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Button(action: onReport) {
+                    Label("Report", systemImage: "flag")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+                .foregroundStyle(.red)
+            }
 
             ZStack(alignment: .bottomLeading) {
                 Group {

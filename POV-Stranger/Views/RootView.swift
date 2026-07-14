@@ -8,8 +8,22 @@ struct RootView: View {
     @Query private var sessions: [StrangerSession]
 
     @State private var matchError: String?
+    @State private var ageGateConfirmed = AgeGateStore.isConfirmed
 
     var body: some View {
+        Group {
+            if ageGateConfirmed {
+                mainContent
+            } else {
+                AgeGateView {
+                    AgeGateStore.confirm()
+                    ageGateConfirmed = true
+                }
+            }
+        }
+    }
+
+    private var mainContent: some View {
         NavigationStack {
             Group {
                 if let session = activeSession {

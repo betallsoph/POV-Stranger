@@ -10,5 +10,7 @@
 	<array>
 		<string>group.antt.POV-Stranger</string>
 	</array>
+	<key>com.apple.developer.sensitivecontentanalysis.client</key>
+	<true/>
 </dict>
 </plist>
