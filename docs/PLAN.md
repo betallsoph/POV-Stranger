@@ -240,7 +240,7 @@ enum SessionStatus: String, Codable {
 ### 4.1 Setup
 - [ ] MongoDB Atlas M0 cluster (manual — see `backend/atlas/README.md`)
 - [x] Collections + TTL indexes script (`backend/atlas/schema/init-indexes.js`)
-- [ ] GridFS for photos (Phase 4c)
+- [ ] GridFS for photos (Phase 4c — code ready, deploy manual)
 - [x] SwiftData models + `remoteSessionId`
 - [x] `Secrets.xcconfig.example` + `.gitignore`
 
@@ -266,8 +266,9 @@ enum SessionStatus: String, Codable {
 - [x] GridFS upload via `uploadPhoto` Function
 - [x] `getPartnerPhoto` — fetch partner blob from GridFS
 - [x] `AtlasSessionService.submitPhoto` + SwiftData cache
-- [ ] APNs silent push on upload (Phase 4d)
-- [ ] Widget update via push handler (Phase 4d)
+- [x] APNs silent push on upload (`_lib/apns.js` + `uploadPhoto`)
+- [x] Widget update via push handler (`PartnerPhotoPushHandler`)
+- [ ] APNs keys in Atlas Values (manual)
 
 ### 4.5 iOS integration
 - [x] `SessionServiceProtocol` + `SessionServiceFactory`
@@ -277,9 +278,9 @@ enum SessionStatus: String, Codable {
 - [x] Sign in with Apple → `AtlasAuthTokenStore`
 
 ### 4.6 Purge
-- [ ] TTL indexes on `hour_uploads`, `farewells`
-- [ ] Scheduled Trigger: GridFS + session purge
-- [ ] **Keep** `pair_history` (metadata only)
+- [x] TTL indexes on `hour_uploads`, `farewells` (`init-indexes.js`)
+- [x] Scheduled Trigger: `sessionLifecycle` — GridFS + session purge
+- [x] **Keep** `pair_history` (metadata only)
 
 **Phase 4 done when:** Two TestFlight devices match, exchange photos for 1+ hours, receive push updates.
 
@@ -302,19 +303,20 @@ enum SessionStatus: String, Codable {
 > Goal: Farewell message + complete data deletion.
 
 ### 5.1 Farewell flow
-- [ ] `Views/FarewellComposeView.swift` — 280 char limit, one-shot
-- [ ] Enable only when `status == .farewell`
-- [ ] Disable after submit
+- [x] `Views/FarewellComposeView.swift` — 280 char limit, one-shot
+- [x] Enable only when `status == .farewell`
+- [x] Disable after submit
+- [x] `submitFarewell` Atlas Function + iOS sync
 
 ### 5.2 Session end
-- [ ] At `expiresAt`: server closes session
-- [ ] Push both devices: "Your stranger is gone"
-- [ ] `Views/SessionEndedView.swift` — reveal partner's farewell (once)
-- [ ] Local purge: SwiftData delete + App Group clear + cancel notifications
+- [x] At `expiresAt`: `sessionLifecycle` scheduled trigger sets `ended`
+- [x] Push both devices: "Your stranger is gone" (APNs alert)
+- [x] `Views/SessionEndedView.swift` — reveal partner's farewell (once)
+- [x] Local purge: SwiftData delete + App Group clear + cancel notifications
 
 ### 5.3 Server purge
-- [ ] Delete all `hour_uploads` for session
-- [ ] Delete storage objects
+- [x] `sessionLifecycle` deletes GridFS + `hour_uploads` + `farewells` per session
+- [x] Sessions marked `purged` after grace period
 - [ ] Keep only anonymized analytics (optional, no PII)
 
 **Phase 5 done when:** After 24h, all photos gone locally and on server; farewell shown once then gone.

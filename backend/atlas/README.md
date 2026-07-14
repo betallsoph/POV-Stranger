@@ -35,12 +35,14 @@ Copy each file from `backend/atlas/functions/` into Atlas App Services → Funct
 | `getActiveSession` | `getActiveSession.js` | Fetch current session for user |
 | `uploadPhoto` | `uploadPhoto.js` | Upload JPEG to GridFS + `hour_uploads` |
 | `getPartnerPhoto` | `getPartnerPhoto.js` | Download partner photo for hour |
+| `submitFarewell` | `submitFarewell.js` | Send farewell message (T-2h) |
+| `sessionLifecycle` | `sessionLifecycle.js` | **Scheduled** — farewell/end/purge |
 
-**Dependencies:** Add the `_lib/` helpers inline or as shared modules per Atlas UI.
+**Dependencies:** Add `_lib/` helpers: `canPair.js`, `isoWeek.js`, `session.js`, `apns.js`, `farewell.js`, `purge.js`.
 
 Link cluster data source name: `mongodb-atlas` (default).
 
-## 5. iOS secrets
+## 4. HTTPS Endpoints
 
 For each function, create an HTTPS Endpoint (authenticated) in App Services:
 
@@ -51,6 +53,9 @@ For each function, create an HTTPS Endpoint (authenticated) in App Services:
 | `getActiveSession` | `getActiveSession` | POST |
 | `uploadPhoto` | `uploadPhoto` | POST |
 | `getPartnerPhoto` | `getPartnerPhoto` | POST |
+| `submitFarewell` | `submitFarewell` | POST |
+
+**Scheduled Trigger:** `sessionLifecycle` every **15 minutes** (no HTTPS endpoint).
 
 Copy the **App Services HTTP base URL** — iOS needs it in `Secrets.xcconfig`.
 
@@ -102,6 +107,26 @@ When **both** keys are set, iOS requires **Sign in with Apple** before matching.
 4. All function calls send `Authorization: Bearer <token>`
 
 Functions use `context.user.id` as the MongoDB user id.
+
+## 7. APNs — silent push (Phase 4d)
+
+In App Services → **Values** (or Secrets):
+
+| Key | Description |
+|-----|-------------|
+| `APNS_KEY_ID` | Apple Key ID (from `.p8` key) |
+| `APNS_TEAM_ID` | Apple Team ID |
+| `APNS_BUNDLE_ID` | `antt.POV-Stranger` |
+| `APNS_PRIVATE_KEY` | Full contents of your `.p8` file |
+| `APNS_USE_SANDBOX` | `true` for dev/TestFlight, `false` for App Store |
+
+After `uploadPhoto`, partner receives silent push:
+
+```json
+{ "aps": { "content-available": 1 }, "type": "partner.photo", "sessionId": "...", "hourIndex": 3 }
+```
+
+iOS fetches photo via `getPartnerPhoto` and reloads widget. Upload works without APNs keys — push is skipped.
 
 ## Collections
 
