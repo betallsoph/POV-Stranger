@@ -328,16 +328,16 @@ enum SessionStatus: String, Codable {
 > **Blocking for release.** Do not ship without these.
 
 ### 6.1 Moderation
-- [ ] On-device sensitive content check before upload (Apple Vision framework)
+- [x] On-device sensitive content check (`SensitiveContentAnalysis`)
 - [ ] Server-side CSAM hash checking
-- [ ] Report button on every partner photo
-- [ ] Report → instant unmatch + block + flag for review
+- [x] Report button on every partner photo
+- [x] Report → block + end session (`reportAndBlock` Function)
 
 ### 6.2 Legal & compliance
-- [ ] Age gate 17+ (App Store age rating + in-app confirmation)
-- [ ] Privacy Policy + Terms of Service
-- [ ] App Privacy Nutrition Labels (location: approximate country only)
-- [ ] GDPR: data deletion on request
+- [x] Age gate 17+ (`AgeGateView`)
+- [x] Privacy Policy + Terms of Service (`docs/legal/`)
+- [ ] App Privacy Nutrition Labels (manual — App Store Connect)
+- [ ] GDPR: data deletion on request (support process)
 
 ### 6.3 App Review prep
 - [ ] Demo video showing full flow
@@ -345,11 +345,11 @@ enum SessionStatus: String, Codable {
 - [ ] Test account or simulated match for reviewer
 
 **Checklist:**
-- [ ] Report flow works
-- [ ] Block prevents rematch
-- [ ] No precise GPS in network payloads
-- [ ] No chat except farewell
-- [ ] Photos deleted after session
+- [x] Report flow works (mock ends locally; cloud calls `reportAndBlock`)
+- [x] Block prevents rematch (`canPair.js` + `blocks` collection)
+- [x] No precise GPS in network payloads
+- [x] No chat except farewell
+- [x] Photos deleted after session
 
 ---
 
